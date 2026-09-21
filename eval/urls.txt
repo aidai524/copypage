@@ -1,0 +1,7 @@
+# Public pages for the capture-determinism eval set.
+# One URL per line; '#' comments. Pick stable, publicly accessible pages.
+https://example.com
+https://developer.mozilla.org/en-US/docs/Web/HTML
+https://tailwindcss.com
+https://react.dev
+https://vite.dev
