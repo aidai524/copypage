@@ -8,6 +8,7 @@
   header { padding: 24px 48px; display: flex; justify-content: space-between; align-items: center; }
   .logo { font-size: 20px; font-weight: 700; }
   .hero { padding: 96px 48px; text-align: center; background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%); }
+  .hero-bg { height: 64px; background-image: url('assets/bg.png'); background-size: cover; }
   .hero h1 { font-size: 48px; font-weight: 800; line-height: 1.1; margin: 0 0 16px; }
   button.cta {
     border: none; cursor: pointer;
@@ -34,6 +35,7 @@
     <img class="broken" src="assets/missing-404.png" width="10" height="10" alt="">
   </header>
   <section class="hero">
+    <div class="hero-bg"></div>
     <h1>Clone me if you can</h1>
     <button class="cta">Get Started</button>
   </section>
@@ -44,6 +46,7 @@
   </section>
   <section class="lazy-section">
     <div id="lazy-content">Lazy loaded block</div>
+    <img id="lazy-img" data-src="assets/logo.png" width="32" height="32" alt="lazy">
   </section>
   <footer>© 2026 Fixture Inc.</footer>
   <div id="sales-chart" style="width:600px;height:300px"></div>
@@ -68,6 +71,8 @@
       if (window.scrollY > 100) {
         loaded = true
         document.getElementById('lazy-content').style.display = 'block'
+        const li = document.getElementById('lazy-img')
+        li.src = li.dataset.src
       }
     })
   </script>
