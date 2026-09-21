@@ -43,6 +43,11 @@ describe('downloadAssets', () => {
     expect(content).toContain('<circle')
   })
 
+  it('downloads css background-image assets', async () => {
+    const bg = result.files.find((f) => f.includes('bg.png'))
+    expect(bg).toBeDefined()
+  })
+
   it('records failed downloads without throwing', async () => {
     expect(result.failed.length).toBeGreaterThanOrEqual(1)
     expect(result.failed[0].url).toContain('missing-404')

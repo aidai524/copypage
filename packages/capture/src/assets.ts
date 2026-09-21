@@ -37,6 +37,19 @@ export async function downloadAssets(page: Page, outDir: string): Promise<Assets
     for (const svg of Array.from(document.querySelectorAll('svg'))) {
       out.push({ kind: 'svg', svgSource: svg.outerHTML, suggestedName: (i++) + '-icon.svg' })
     }
+    // css background-image urls (hero banners etc. live here, not in img tags)
+    const seen = new Set(out.map((a) => a.url).filter(Boolean))
+    for (const el of Array.from(document.querySelectorAll('*'))) {
+      const bg = getComputedStyle(el).backgroundImage
+      if (!bg || bg === 'none') continue
+      for (const m of bg.matchAll(/url\\(["']?([^"')]+)["']?\\)/g)) {
+        const u = m[1]
+        if (!u || u.startsWith('data:') || seen.has(u)) continue
+        seen.add(u)
+        const name = u.split('/').pop()?.split('?')[0] || 'bg-' + i + '.png'
+        out.push({ kind: 'url', url: new URL(u, location.href).href, suggestedName: (i++) + '-' + name })
+      }
+    }
     return out
   })()`)
 

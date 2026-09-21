@@ -15,6 +15,8 @@ export interface CaptureSiteOptions {
 
 const DEFAULT_VIEWPORTS = [1440, 768, 375]
 
+const log = (msg: string) => console.error(`[capture] ${msg}`)
+
 /**
  * Capture a live URL: per-viewport full-page screenshot + DOM snapshot,
  * plus page meta. Writes a snapshot/ directory consumable by diff tools.
@@ -37,13 +39,18 @@ export async function captureSite(
     const doms: DomSnapshot[] = []
 
     for (const width of viewports) {
+      log(`viewport ${width}: loading ${url}`)
       const page = await browser.newPage({ viewport: { width, height } })
       try {
-        await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 })
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
+        // heavy sites never reach networkidle — wait bounded settle instead
+        await page.waitForLoadState('load', { timeout: 20000 }).catch(() => {})
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
         await autoScroll(page)
         const shotRel = `screenshots/${width}.png`
         await page.screenshot({ path: path.join(outDir, shotRel), fullPage: true })
         const root = await probeDom(page)
+        log(`viewport ${width}: done`)
         const dom: DomSnapshot = {
           url: page.url(),
           viewport: { width, height },
@@ -62,6 +69,7 @@ export async function captureSite(
     const page = await browser.newPage({ viewport: { width: viewports[0], height } })
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
+      log('meta pass: loaded, scrolling')
       await autoScroll(page) // lazy assets/charts/interactive elements render on scroll
       const meta: SnapshotMeta = await page.evaluate(`(() => {
         const favicon = document.querySelector('link[rel~="icon"]')?.href
@@ -77,8 +85,11 @@ export async function captureSite(
       await writeFile(path.join(outDir, 'meta.json'), JSON.stringify(meta, null, 2))
 
       const assets = await downloadAssets(page, outDir)
+      log(`assets: ${assets.files.length} ok, ${assets.failed.length} failed`)
       await captureStates(page, outDir)
+      log('states: done')
       const charts = await detectCharts(page)
+      log(`charts: ${charts.length} found`)
       if (charts.length > 0) {
         await writeFile(path.join(outDir, 'charts.json'), JSON.stringify(charts, null, 2))
         snapshotCharts = 'charts.json'

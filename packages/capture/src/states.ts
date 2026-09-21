@@ -56,12 +56,14 @@ export async function captureStates(page: Page, outDir: string): Promise<StateCa
   for (const { idx, selector } of targets) {
     const i = idx
     const loc = page.locator(`[data-cp-idx="${i}"]`)
+    // skip hidden/detached elements fast instead of waiting out actionability timeouts
+    if (!(await loc.isVisible({ timeout: 800 }).catch(() => false))) continue
 
     const triggers: { state: StateCapture['state']; apply: () => Promise<void>; release: () => Promise<void> }[] = [
-      { state: 'hover', apply: () => loc.hover(), release: () => page.mouse.move(0, 0) },
+      { state: 'hover', apply: () => loc.hover({ timeout: 2000 }), release: () => page.mouse.move(0, 0) },
       {
         state: 'focus',
-        apply: () => loc.focus(),
+        apply: () => loc.focus({ timeout: 2000 }),
         release: () => page.evaluate(`(() => { const a = document.activeElement; if (a && a.blur) a.blur() })()`),
       },
       {
@@ -77,14 +79,14 @@ export async function captureStates(page: Page, outDir: string): Promise<StateCa
 
     for (const t of triggers) {
       try {
-        await loc.scrollIntoViewIfNeeded()
+        await loc.scrollIntoViewIfNeeded({ timeout: 2000 })
         await t.apply()
         await page.waitForTimeout(120)
         const styles = await page.evaluate(
           `(${READ_STYLES_SRC})(document.querySelector('[data-cp-idx="${i}"]'))`,
         )
         const cropRel = path.join('states', `${i}.${t.state}.png`)
-        await loc.screenshot({ path: path.join(outDir, cropRel), timeout: 5000 })
+        await loc.screenshot({ path: path.join(outDir, cropRel), timeout: 2000 })
         results.push({ selector, state: t.state, styles: styles as ComputedStyles, crop: cropRel })
       } catch {
         // element vanished / not hittable — skip this state
