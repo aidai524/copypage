@@ -5,6 +5,7 @@ import { writeSnapshot, type DomSnapshot, type Snapshot, type SnapshotMeta } fro
 import { autoScroll, probeDom } from './probe.js'
 import { downloadAssets } from './assets.js'
 import { captureStates } from './states.js'
+import { detectCharts } from './charts.js'
 
 export interface CaptureSiteOptions {
   viewports?: number[]
@@ -30,6 +31,7 @@ export async function captureSite(
 
   const browser = await chromium.launch()
   let snapshotAssets: string | undefined
+  let snapshotCharts: string | undefined
   try {
     const screenshots: Record<string, string> = {}
     const doms: DomSnapshot[] = []
@@ -75,6 +77,11 @@ export async function captureSite(
 
       const assets = await downloadAssets(page, outDir)
       await captureStates(page, outDir)
+      const charts = await detectCharts(page)
+      if (charts.length > 0) {
+        await writeFile(path.join(outDir, 'charts.json'), JSON.stringify(charts, null, 2))
+        snapshotCharts = 'charts.json'
+      }
       if (assets.failed.length > 0) {
         await writeFile(
           path.join(outDir, 'assets-failed.json'),
@@ -92,6 +99,7 @@ export async function captureSite(
       screenshots,
       dom: doms,
       ...(snapshotAssets ? { assetsDir: snapshotAssets } : {}),
+      ...(snapshotCharts ? { charts: snapshotCharts } : {}),
     }
     await writeSnapshot(outDir, snapshot)
   } finally {

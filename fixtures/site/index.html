@@ -47,6 +47,20 @@
     <div id="lazy-content">Lazy loaded block</div>
   </section>
   <footer>© 2026 Fixture Inc.</footer>
+  <div id="sales-chart" style="width:600px;height:300px"></div>
+  <script>
+    // simulate a Highcharts instance registry
+    window.Highcharts = {
+      charts: [{
+        options: {
+          chart: { type: 'column', renderTo: 'sales-chart' },
+          title: { text: 'Monthly Sales' },
+          xAxis: { categories: ['Jan', 'Feb', 'Mar'] },
+          series: [{ name: 'Revenue', data: [120, 200, 150] }]
+        }
+      }]
+    }
+  </script>
   <script>
     // lazy content: appears only after user scrolls near it
     let loaded = false
