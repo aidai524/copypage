@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "baseUrl": ".",
+    "paths": {
+      "@copypage/core": ["packages/core/src/index.ts"],
+      "@copypage/capture": ["packages/capture/src/index.ts"],
+      "@copypage/render": ["packages/render/src/index.ts"],
+      "@copypage/diff": ["packages/diff/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "eval/**/*.ts"]
+}
