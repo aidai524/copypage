@@ -1,0 +1,1 @@
+{ "name": "@copypage/capture", "version": "0.1.0", "private": true, "type": "module", "exports": { ".": "./src/index.ts" }, "dependencies": { "@copypage/core": "*", "playwright": "^1", "sharp": "^0.34" } }
