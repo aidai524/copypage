@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { writeSnapshot, type Snapshot, type VideoFrame } from '@copypage/core'
+import { writeBriefScaffold } from './brief.js'
 
 const run = promisify(execFile)
 
@@ -111,4 +112,5 @@ export async function captureVideo(
     frames,
   }
   await writeSnapshot(outDir, snapshot)
+  await writeBriefScaffold(outDir, 'video')
 }

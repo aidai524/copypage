@@ -2,6 +2,7 @@ import { copyFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
 import { writeSnapshot, type Snapshot } from '@copypage/core'
+import { writeBriefScaffold } from './brief.js'
 
 const MAX_EDGE = 4096
 
@@ -40,4 +41,5 @@ export async function captureImage(file: string, outDir: string): Promise<void> 
     screenshots: { original: origRel, '0.5x': 'scales/0.5x.png', '2x': 'scales/2x.png' },
   }
   await writeSnapshot(outDir, snapshot)
+  await writeBriefScaffold(outDir, 'image')
 }
