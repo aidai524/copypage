@@ -32,12 +32,13 @@ export async function captureRepro(
   outDir: string,
   opts: CaptureSiteOptions = {},
 ): Promise<void> {
-  const distDir = (await exists(path.join(reproDir, 'dist')))
-    ? path.join(reproDir, 'dist')
-    : reproDir
+  const hasPkg = await exists(path.join(reproDir, 'package.json'))
+  const distDir = path.join(reproDir, 'dist')
+  const hasDistIndex = await exists(path.join(distDir, 'index.html'))
 
-  if (!(await exists(path.join(distDir, 'index.html'))) && (await exists(path.join(reproDir, 'package.json')))) {
-    // needs a build
+  // Vite-style projects have a root index.html — never let it fool us into
+  // skipping the build. Build whenever there's a build script and no dist.
+  if (hasPkg && !hasDistIndex) {
     await new Promise<void>((resolve, reject) => {
       execFile(
         'npm',
@@ -54,7 +55,7 @@ export async function captureRepro(
     })
   }
 
-  const serveDir = (await exists(path.join(reproDir, 'dist'))) ? path.join(reproDir, 'dist') : distDir
+  const serveDir = (await exists(path.join(distDir, 'index.html'))) ? distDir : reproDir
   const server = await serveStatic(serveDir)
   try {
     await captureSite(server.url, outDir, opts)

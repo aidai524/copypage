@@ -42,6 +42,14 @@ describe('captureSite', () => {
     expect(dom.url).toBe(server.url + '/')
   })
 
+  it('collects lazy-loaded assets (requires autoscroll in meta pass)', async () => {
+    const { readdir } = await import('node:fs/promises')
+    const assets = await readdir(path.join(outDir, 'assets'))
+    // logo.png appears twice: header img + lazy img
+    const pngs = assets.filter((f) => f.endsWith('logo.png'))
+    expect(pngs.length).toBeGreaterThanOrEqual(2)
+  })
+
   it('writes a valid snapshot.json readable by readSnapshot', async () => {
     const snap = await readSnapshot(outDir)
     expect(snap.input.type).toBe('url')

@@ -45,6 +45,7 @@
   </section>
   <section class="lazy-section">
     <div id="lazy-content">Lazy loaded block</div>
+    <img id="lazy-img" data-src="assets/logo.png" width="32" height="32" alt="lazy">
   </section>
   <footer>© 2026 Fixture Inc.</footer>
   <div id="sales-chart" style="width:600px;height:300px"></div>
@@ -69,6 +70,8 @@
       if (window.scrollY > 100) {
         loaded = true
         document.getElementById('lazy-content').style.display = 'block'
+        const li = document.getElementById('lazy-img')
+        li.src = li.dataset.src
       }
     })
   </script>

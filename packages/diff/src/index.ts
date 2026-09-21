@@ -55,6 +55,71 @@ export async function diffSnapshots(
 
   const viewports = orig.viewports.length ? orig.viewports : repro.viewports
 
+  // visual-input orig (image/video) has screenshots keyed 'original' etc. that
+  // never intersect the repro's viewport keys — handle as a virtual viewport.
+  const keyOverlap = viewports.some(
+    (w) => orig.screenshots[String(w)] && repro.screenshots[String(w)],
+  )
+  if (!keyOverlap && orig.input.type !== 'url') {
+    const aShot = orig.screenshots['original'] ?? Object.values(orig.screenshots)[0]
+    const bShot = Object.values(repro.screenshots)[0]
+    if (aShot && bShot) {
+      const heatRel = 'heatmap-visual.png'
+      const res = await pixelDiff(path.join(origDir, aShot), path.join(reproDir, bShot), path.join(outDir, heatRel))
+      if ('layoutError' in res) {
+        // size mismatch: whole-pair VLM request + worst-case metrics
+        entries.push({
+          id: 'd-layout-visual',
+          element: 'page',
+          property: 'layout',
+          expected: 'repro screenshot matches original image size',
+          actual: 'size mismatch',
+          severity: 100,
+        })
+        ssimSum += 0
+        ssimN++
+        pixelDiffPctMax = 100
+        const cropRel = 'crops/visual-full-orig.png'
+        const reproCropRel = 'crops/visual-full-repro.png'
+        const { copyFile } = await import('node:fs/promises')
+        await mkdir(path.join(outDir, 'crops'), { recursive: true })
+        await copyFile(path.join(origDir, aShot), path.join(outDir, cropRel))
+        await copyFile(path.join(reproDir, bShot), path.join(outDir, reproCropRel))
+        vlmRequests.push({
+          id: 'vlm-visual-full',
+          crop: cropRel,
+          reproCrop: reproCropRel,
+          prompt:
+            '对比这两张整页截图（orig=设计稿/原图, repro=还原页，尺寸不同请先对齐感受）。' +
+            '列出布局与样式的所有可见差异，每条输出 JSON：' +
+            '{"element": 描述, "property": css属性, "expected": "原图值", "actual": "还原值"}。只输出 JSON 数组。',
+        })
+      } else {
+        ssimSum += res.ssim
+        ssimN++
+        pixelDiffPctMax = Math.max(pixelDiffPctMax, res.pixelDiffPct)
+        const regions = await diffRegions(path.join(outDir, heatRel))
+        for (let i = 0; i < Math.min(regions.length, 20); i++) {
+          const rg = regions[i]
+          const id = `vlm-visual-${i}`
+          const cropRel = `crops/${id}-orig.png`
+          const reproCropRel = `crops/${id}-repro.png`
+          await cropPng(path.join(origDir, aShot), rg.bbox, path.join(outDir, cropRel))
+          await cropPng(path.join(reproDir, bShot), rg.bbox, path.join(outDir, reproCropRel))
+          vlmRequests.push({
+            id,
+            crop: cropRel,
+            reproCrop: reproCropRel,
+            prompt:
+              '对比这两张同一区域的截图（orig=原图, repro=还原）。列出所有可见差异：' +
+              '颜色、尺寸、间距、圆角、阴影、字体、缺失/多余元素。' +
+              '每条输出 JSON：{"element": 描述, "property": css属性, "expected": "原图值", "actual": "还原值"}。只输出 JSON 数组。',
+          })
+        }
+      }
+    }
+  }
+
   for (const width of viewports) {
     const aShot = orig.screenshots[String(width)]
     const bShot = repro.screenshots[String(width)]
@@ -72,6 +137,10 @@ export async function diffSnapshots(
         actual: 'size mismatch',
         severity: 100,
       })
+      // layout-broken viewport must poison metrics — never let it pass silently
+      ssimSum += 0
+      ssimN++
+      pixelDiffPctMax = 100
       continue
     }
 

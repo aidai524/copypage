@@ -2,13 +2,16 @@
   "name": "copypage",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "test": "vitest run",
     "capture": "tsx packages/capture/src/cli.ts",
     "diff": "tsx packages/diff/src/cli.ts"
   },
   "devDependencies": {
+    "@types/culori": "^4.0.1",
     "@types/node": "^22",
     "@types/pngjs": "^6",
     "tsx": "^4",

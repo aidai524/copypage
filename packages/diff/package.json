@@ -8,8 +8,9 @@
   },
   "dependencies": {
     "@copypage/core": "*",
-    "pngjs": "^7",
+    "culori": "^4.0.2",
     "pixelmatch": "^7",
+    "pngjs": "^7",
     "ssim.js": "^4"
   }
 }

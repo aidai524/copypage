@@ -33,10 +33,13 @@ export async function pixelDiff(aPath: string, bPath: string, heatmapOut: string
 
   await writeFile(heatmapOut, PNG.sync.write(diffMask))
 
-  const { mssim } = ssim(
-    { data: new Uint8ClampedArray(a.data.buffer, a.data.byteOffset, a.data.length), width, height },
-    { data: new Uint8ClampedArray(b.data.buffer, b.data.byteOffset, b.data.length), width, height },
-  )
+  const toImageData = (png: PNG) => ({
+    data: new Uint8ClampedArray(new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.length)),
+    width: png.width,
+    height: png.height,
+    colorSpace: 'srgb' as const,
+  })
+  const { mssim } = ssim(toImageData(a), toImageData(b))
 
   return {
     ssim: mssim,

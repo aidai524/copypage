@@ -1,0 +1,7 @@
+{
+  "name": "repro-vite-fixture",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.writeFileSync('dist/index.html','<!doctype html><title>FROM-DIST</title><body>built</body>')\""
+  }
+}

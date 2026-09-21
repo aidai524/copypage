@@ -62,6 +62,7 @@ export async function captureSite(
     const page = await browser.newPage({ viewport: { width: viewports[0], height } })
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
+      await autoScroll(page) // lazy assets/charts/interactive elements render on scroll
       const meta: SnapshotMeta = await page.evaluate(`(() => {
         const favicon = document.querySelector('link[rel~="icon"]')?.href
         const bodyBg = getComputedStyle(document.body).backgroundColor

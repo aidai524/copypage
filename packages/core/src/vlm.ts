@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 export type VlmContentPart =
@@ -12,8 +13,31 @@ export interface VlmMessage {
 
 function env(name: string): string {
   const v = process.env[name]
-  if (!v) throw new Error(`${name} not set — put it in .env (see .env.example)`)
+  if (!v) throw new Error(`${name} not set — put it in .env at the project root`)
   return v
+}
+
+/**
+ * Load .env (KEY=value lines) into process.env without clobbering existing
+ * vars. Called lazily by vlmChat so CLI runs work without dotenv.
+ */
+export function ensureEnvLoaded(dir: string = process.cwd()): void {
+  const file = path.join(dir, '.env')
+  if (!existsSync(file)) return
+  try {
+    process.loadEnvFile(file)
+  } catch {
+    // older node / malformed file: fall through to manual parse
+    try {
+      const content = readFileSync(file, 'utf8')
+      for (const line of content.split('\n')) {
+        const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/)
+        if (m && !(m[1] in process.env)) process.env[m[1]] = m[2]
+      }
+    } catch {
+      // unreadable .env — env() will report the missing var
+    }
+  }
 }
 
 /** Attach a local image file as a base64 data-url content part. */
@@ -29,6 +53,7 @@ export async function imagePart(file: string): Promise<VlmContentPart> {
  * apimart answers with SSE even without stream:true — handle both.
  */
 export async function vlmChat(messages: VlmMessage[], opts: { maxTokens?: number } = {}): Promise<string> {
+  ensureEnvLoaded()
   const base = process.env.APIMART_BASE_URL ?? 'https://api.apimart.ai/v1'
   const model = process.env.VLM_MODEL ?? 'gpt-4o'
   const key = env('APIMART_API_KEY')
@@ -39,6 +64,7 @@ export async function vlmChat(messages: VlmMessage[], opts: { maxTokens?: number
       authorization: `Bearer ${key}`,
       'content-type': 'application/json',
     },
+    signal: AbortSignal.timeout(120000),
     body: JSON.stringify({
       model,
       messages,
