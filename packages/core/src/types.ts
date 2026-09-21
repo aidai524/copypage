@@ -33,6 +33,8 @@ export interface ElementNode {
   box: BoxModel
   styles: ComputedStyles
   text?: string
+  /** semantic attributes: img.src, a.href, video src/poster */
+  attrs?: Record<string, string>
   children: ElementNode[]
 }
 

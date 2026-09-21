@@ -66,6 +66,14 @@ const PROBE_SRC = `(maxNodes) => {
       if (node) children.push(node)
     })
 
+    const attrs = {}
+    if (el.tagName === 'IMG' && el.src) attrs.src = el.src
+    if (el.tagName === 'A' && el.href) attrs.href = el.href
+    if (el.tagName === 'VIDEO') {
+      if (el.src) attrs.src = el.src
+      if (el.poster) attrs.poster = el.poster
+    }
+
     return {
       id: path,
       tag: el.tagName.toLowerCase(),
@@ -73,6 +81,7 @@ const PROBE_SRC = `(maxNodes) => {
       box: { x: r.x, y: r.y, width: r.width, height: r.height },
       styles,
       ...(ownText ? { text: ownText } : {}),
+      ...(Object.keys(attrs).length ? { attrs } : {}),
       children,
     }
   }

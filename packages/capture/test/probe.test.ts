@@ -60,6 +60,18 @@ describe('probeDom', () => {
     expect(ids).toContain('lazy-content')
   })
 
+  it('captures img src / a href attributes', async () => {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.goto(server.url)
+    const root = await probeDom(page)
+    await page.close()
+
+    const img = findBySelector(root, 'img')
+    expect(img?.attrs?.src).toContain('logo.png')
+    const link = findBySelector(root, 'a')
+    expect(link?.attrs?.href).toContain('#features')
+  })
+
   it('skips invisible elements and assigns path ids', async () => {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
     await page.goto(server.url)
