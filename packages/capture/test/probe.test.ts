@@ -68,7 +68,8 @@ describe('probeDom', () => {
 
     const img = findBySelector(root, 'img')
     expect(img?.attrs?.src).toContain('logo.png')
-    const link = findBySelector(root, 'a')
+    let link: ElementNode | undefined
+    for (const n of walkAll(root)) if (n.tag === 'a') { link = n; break }
     expect(link?.attrs?.href).toContain('#features')
   })
 
