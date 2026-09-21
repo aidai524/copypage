@@ -4,6 +4,7 @@ import path from 'node:path'
 import { writeSnapshot, type DomSnapshot, type Snapshot, type SnapshotMeta } from '@copypage/core'
 import { autoScroll, probeDom } from './probe.js'
 import { downloadAssets } from './assets.js'
+import { captureStates } from './states.js'
 
 export interface CaptureSiteOptions {
   viewports?: number[]
@@ -73,6 +74,7 @@ export async function captureSite(
       await writeFile(path.join(outDir, 'meta.json'), JSON.stringify(meta, null, 2))
 
       const assets = await downloadAssets(page, outDir)
+      await captureStates(page, outDir)
       if (assets.failed.length > 0) {
         await writeFile(
           path.join(outDir, 'assets-failed.json'),
