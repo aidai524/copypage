@@ -62,17 +62,17 @@ export async function captureSite(
     const page = await browser.newPage({ viewport: { width: viewports[0], height } })
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
-      const meta: SnapshotMeta = await page.evaluate(() => {
-        const favicon = document.querySelector<HTMLLinkElement>('link[rel~="icon"]')?.href
+      const meta: SnapshotMeta = await page.evaluate(`(() => {
+        const favicon = document.querySelector('link[rel~="icon"]')?.href
         const bodyBg = getComputedStyle(document.body).backgroundColor
         const dark = window.matchMedia('(prefers-color-scheme: dark)').matches
         return {
           title: document.title,
           ...(favicon ? { favicon } : {}),
           backgroundColor: bodyBg,
-          colorScheme: dark ? ('dark' as const) : ('light' as const),
+          colorScheme: dark ? 'dark' : 'light',
         }
-      })
+      })()`) as SnapshotMeta
       await writeFile(path.join(outDir, 'meta.json'), JSON.stringify(meta, null, 2))
 
       const assets = await downloadAssets(page, outDir)

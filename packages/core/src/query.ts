@@ -31,3 +31,24 @@ export function querySelector(root: ElementNode, cssLike: string): ElementNode[]
   visit(root)
   return out
 }
+
+// CLI: tsx packages/core/src/query.ts <snapshotDir> --viewport 1440 (--region 0/1/0 | --selector button.cta)
+if (process.argv[1]?.endsWith('query.ts')) {
+  const { readFile } = await import('node:fs/promises')
+  const path = await import('node:path')
+  const arg = (name: string) => {
+    const i = process.argv.indexOf(`--${name}`)
+    return i >= 0 ? process.argv[i + 1] : undefined
+  }
+  const dir = process.argv[2]
+  const viewport = arg('viewport')
+  const region = arg('region')
+  const selector = arg('selector')
+  if (!dir || !viewport || (!region && !selector)) {
+    console.error('usage: query.ts <snapshotDir> --viewport <w> --region <id> | --selector <css>')
+    process.exit(1)
+  }
+  const dom = JSON.parse(await readFile(path.join(dir, 'dom', `${viewport}.json`), 'utf8'))
+  const result = region ? queryRegion(dom.root, region) : querySelector(dom.root, selector!)
+  console.log(JSON.stringify(result, null, 2))
+}

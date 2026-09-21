@@ -12,22 +12,35 @@ export interface StateCapture {
 }
 
 const MAX_TARGETS = 50
-const INTERACTIVE = 'button, a, input, [role="button"], select, textarea'
 
-function readStylesInPage(): (el: Element) => Record<string, string> {
-  return (el: Element) => {
-    const PROPS = [
-      'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color',
-      'backgroundColor', 'backgroundImage', 'borderRadius', 'boxShadow', 'border',
-      'padding', 'margin', 'transform', 'opacity', 'zIndex', 'display', 'position',
-      'outline',
-    ] as const
-    const cs = getComputedStyle(el)
-    const out: Record<string, string> = {}
-    for (const p of PROPS) out[p] = (cs as unknown as Record<string, string>)[p] ?? ''
-    return out
-  }
-}
+// string source — avoids TS transpile helpers leaking into the browser
+const READ_STYLES_SRC = `(el) => {
+  const PROPS = [
+    'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color',
+    'backgroundColor', 'backgroundImage', 'borderRadius', 'boxShadow', 'border',
+    'padding', 'margin', 'transform', 'opacity', 'zIndex', 'display', 'position',
+    'outline',
+  ]
+  const cs = getComputedStyle(el)
+  const out = {}
+  for (const p of PROPS) out[p] = cs[p] ?? ''
+  return out
+}`
+
+// tag interactive elements with data-cp-idx, return their selectors
+const TAG_SRC = `(() => {
+  const els = Array.from(document.querySelectorAll('button, a, input, [role="button"], select, textarea')).slice(0, ${MAX_TARGETS})
+  return els.map((el, i) => {
+    el.setAttribute('data-cp-idx', String(i))
+    const idPart = el.id ? '#' + el.id : ''
+    const cls = Array.from(el.classList).slice(0, 2).map((c) => '.' + c).join('')
+    return { idx: i, selector: el.tagName.toLowerCase() + idPart + cls }
+  })
+})()`
+
+const UNTAG_SRC = `(() => {
+  for (const el of Array.from(document.querySelectorAll('[data-cp-idx]'))) el.removeAttribute('data-cp-idx')
+})()`
 
 /**
  * Trigger hover/focus/active on interactive elements, capture computed styles
@@ -38,19 +51,19 @@ export async function captureStates(page: Page, outDir: string): Promise<StateCa
   await mkdir(statesDir, { recursive: true })
   const results: StateCapture[] = []
 
-  const count = Math.min(await page.locator(INTERACTIVE).count(), MAX_TARGETS)
+  const targets: { idx: number; selector: string }[] = await page.evaluate(TAG_SRC)
 
-  for (let i = 0; i < count; i++) {
-    const loc = page.locator(INTERACTIVE).nth(i)
-    const selector = await loc.evaluate((el) => {
-      const idPart = el.id ? `#${el.id}` : ''
-      const cls = Array.from(el.classList).slice(0, 2).map((c) => '.' + c).join('')
-      return el.tagName.toLowerCase() + idPart + cls
-    })
+  for (const { idx, selector } of targets) {
+    const i = idx
+    const loc = page.locator(`[data-cp-idx="${i}"]`)
 
     const triggers: { state: StateCapture['state']; apply: () => Promise<void>; release: () => Promise<void> }[] = [
       { state: 'hover', apply: () => loc.hover(), release: () => page.mouse.move(0, 0) },
-      { state: 'focus', apply: () => loc.focus(), release: () => page.evaluate(() => (document.activeElement as HTMLElement)?.blur()) },
+      {
+        state: 'focus',
+        apply: () => loc.focus(),
+        release: () => page.evaluate(`(() => { const a = document.activeElement; if (a && a.blur) a.blur() })()`),
+      },
       {
         state: 'active',
         apply: async () => {
@@ -67,7 +80,9 @@ export async function captureStates(page: Page, outDir: string): Promise<StateCa
         await loc.scrollIntoViewIfNeeded()
         await t.apply()
         await page.waitForTimeout(120)
-        const styles = await loc.evaluate(readStylesInPage())
+        const styles = await page.evaluate(
+          `(${READ_STYLES_SRC})(document.querySelector('[data-cp-idx="${i}"]'))`,
+        )
         const cropRel = path.join('states', `${i}.${t.state}.png`)
         await loc.screenshot({ path: path.join(outDir, cropRel), timeout: 5000 })
         results.push({ selector, state: t.state, styles: styles as ComputedStyles, crop: cropRel })
@@ -79,5 +94,6 @@ export async function captureStates(page: Page, outDir: string): Promise<StateCa
     }
   }
 
+  await page.evaluate(UNTAG_SRC).catch(() => {})
   return results
 }

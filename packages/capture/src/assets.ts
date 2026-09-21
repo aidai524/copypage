@@ -19,35 +19,26 @@ export async function downloadAssets(page: Page, outDir: string): Promise<Assets
   const assetsDir = path.join(outDir, 'assets')
   await mkdir(assetsDir, { recursive: true })
 
-  const collected: CollectedAsset[] = await page.evaluate(() => {
-    const out: {
-      kind: 'url' | 'svg'
-      url?: string
-      svgSource?: string
-      suggestedName: string
-    }[] = []
+  const collected: CollectedAsset[] = await page.evaluate(`(() => {
+    const out = []
     let i = 0
     for (const img of Array.from(document.querySelectorAll('img[src]'))) {
-      const src = (img as HTMLImageElement).src
+      const src = img.src
       if (!src || src.startsWith('data:')) continue
-      const name = src.split('/').pop()?.split('?')[0] || `img-${i}.png`
-      out.push({ kind: 'url', url: src, suggestedName: `${i++}-${name}` })
+      const name = src.split('/').pop()?.split('?')[0] || 'img-' + i + '.png'
+      out.push({ kind: 'url', url: src, suggestedName: (i++) + '-' + name })
     }
     for (const link of Array.from(document.querySelectorAll('link[rel~="icon"][href]'))) {
-      const href = (link as HTMLLinkElement).href
+      const href = link.href
       if (!href || href.startsWith('data:')) continue
       const name = href.split('/').pop()?.split('?')[0] || 'favicon.ico'
-      out.push({ kind: 'url', url: href, suggestedName: `${i++}-${name}` })
+      out.push({ kind: 'url', url: href, suggestedName: (i++) + '-' + name })
     }
     for (const svg of Array.from(document.querySelectorAll('svg'))) {
-      out.push({
-        kind: 'svg',
-        svgSource: svg.outerHTML,
-        suggestedName: `${i++}-icon.svg`,
-      })
+      out.push({ kind: 'svg', svgSource: svg.outerHTML, suggestedName: (i++) + '-icon.svg' })
     }
     return out
-  })
+  })()`)
 
   const files: string[] = []
   const failed: { url: string; reason: string }[] = []
