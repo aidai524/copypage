@@ -17,7 +17,7 @@ const MAX_TARGETS = 50
 const READ_STYLES_SRC = `(el) => {
   const PROPS = [
     'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color',
-    'backgroundColor', 'backgroundImage', 'borderRadius', 'boxShadow', 'border',
+    'backgroundColor', 'backgroundImage', 'backgroundSize', 'backgroundPosition', 'borderRadius', 'boxShadow', 'border',
     'padding', 'margin', 'transform', 'opacity', 'zIndex', 'display', 'position',
     'outline',
   ]

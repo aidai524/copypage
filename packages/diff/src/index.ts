@@ -128,7 +128,9 @@ export async function diffSnapshots(
     const heatRel = `heatmap-${width}.png`
     const res = await pixelDiff(path.join(origDir, aShot), path.join(reproDir, bShot), path.join(outDir, heatRel))
 
+    let pixelOk = true
     if ('layoutError' in res) {
+      pixelOk = false
       entries.push({
         id: `d-layout-${width}`,
         element: 'page',
@@ -141,41 +143,43 @@ export async function diffSnapshots(
       ssimSum += 0
       ssimN++
       pixelDiffPctMax = 100
-      continue
+      // NOTE: no continue — DOM comparison below still tells us WHY sizes differ
+    } else {
+      ssimSum += res.ssim
+      ssimN++
+      pixelDiffPctMax = Math.max(pixelDiffPctMax, res.pixelDiffPct)
     }
-
-    ssimSum += res.ssim
-    ssimN++
-    pixelDiffPctMax = Math.max(pixelDiffPctMax, res.pixelDiffPct)
 
     // DOM layer
     const aDom = await readDom(origDir, width)
     const bDom = await readDom(reproDir, width)
     let usedDom = false
     if (aDom && bDom) {
+      // Always run DOM comparison when both sides have DOM. Matched pairs are
+      // high-precision (composite score >= 0.5); unmatched nodes become
+      // presence entries (real clones legitimately lack hidden menus etc.).
       const alignment = alignTrees(aDom.root, bDom.root, opts.idMap)
-      if (alignment.failureRate <= 0.3) {
-        usedDom = true
-        const pageArea = width * Math.max(aDom.root.box.height, bDom.root.box.height)
-        for (const [o, r] of alignment.pairs) {
-          entries.push(...comparePair(o, r, pageArea))
-        }
-        for (const m of alignment.missing) {
-          entries.push({
-            id: `d-miss-${m.id}`,
-            element: m.selector,
-            property: 'presence',
-            expected: 'present',
-            actual: 'missing in repro',
-            severity: 50,
-            evidence: { heatmapRegion: [m.box.x, m.box.y, m.box.width, m.box.height] },
-          })
-        }
+      usedDom = true
+      const pageArea = width * Math.max(aDom.root.box.height, bDom.root.box.height)
+      for (const [o, r] of alignment.pairs) {
+        entries.push(...comparePair(o, r, pageArea))
+      }
+      for (const m of alignment.missing) {
+        if (m.box.width < 10 || m.box.height < 10) continue // hidden/a11y noise
+        entries.push({
+          id: `d-miss-${m.id}`,
+          element: m.selector,
+          property: 'presence',
+          expected: m.text ? `present: "${m.text.slice(0, 40)}"` : `present (${Math.round(m.box.width)}x${Math.round(m.box.height)} @${Math.round(m.box.x)},${Math.round(m.box.y)})`,
+          actual: 'missing in repro',
+          severity: +(50 * (m.box.width * m.box.height) / pageArea).toFixed(1),
+          evidence: { heatmapRegion: [m.box.x, m.box.y, m.box.width, m.box.height] },
+        })
       }
     }
 
-    // crop/VLM layer when DOM layer unavailable
-    if (!usedDom) {
+    // crop/VLM layer when DOM layer unavailable (needs same-size heatmap)
+    if (!usedDom && pixelOk) {
       const regions = await diffRegions(path.join(outDir, heatRel))
       for (let i = 0; i < Math.min(regions.length, 20); i++) {
         const rg = regions[i]

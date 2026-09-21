@@ -6,6 +6,7 @@ import { autoScroll, probeDom } from './probe.js'
 import { downloadAssets } from './assets.js'
 import { captureStates } from './states.js'
 import { detectCharts } from './charts.js'
+import { freezeDynamic, registerTimerHooks } from './freeze.js'
 
 export interface CaptureSiteOptions {
   viewports?: number[]
@@ -41,12 +42,14 @@ export async function captureSite(
     for (const width of viewports) {
       log(`viewport ${width}: loading ${url}`)
       const page = await browser.newPage({ viewport: { width, height } })
+      await registerTimerHooks(page)
       try {
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
         // heavy sites never reach networkidle — wait bounded settle instead
         await page.waitForLoadState('load', { timeout: 20000 }).catch(() => {})
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
         await autoScroll(page)
+        await freezeDynamic(page)
         const shotRel = `screenshots/${width}.png`
         await page.screenshot({ path: path.join(outDir, shotRel), fullPage: true })
         const root = await probeDom(page)
@@ -67,10 +70,12 @@ export async function captureSite(
 
     // meta from the first (desktop) viewport
     const page = await browser.newPage({ viewport: { width: viewports[0], height } })
+    await registerTimerHooks(page)
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
       log('meta pass: loaded, scrolling')
       await autoScroll(page) // lazy assets/charts/interactive elements render on scroll
+      await freezeDynamic(page)
       const meta: SnapshotMeta = await page.evaluate(`(() => {
         const favicon = document.querySelector('link[rel~="icon"]')?.href
         const bodyBg = getComputedStyle(document.body).backgroundColor

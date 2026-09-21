@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Dynamic Fixture</title></head>
+<body>
+  <div id="rotator" style="width:100px;height:40px;background:#6366f1">A</div>
+  <script>
+    let state = 0
+    setInterval(() => {
+      state = 1 - state
+      const el = document.getElementById('rotator')
+      el.textContent = state ? 'B' : 'A'
+      el.style.background = state ? '#ef4444' : '#6366f1'
+    }, 50)
+  </script>
+</body></html>

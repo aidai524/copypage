@@ -13,6 +13,8 @@ export interface ComputedStyles {
   color: string
   backgroundColor: string
   backgroundImage: string
+  backgroundSize: string
+  backgroundPosition: string
   borderRadius: string
   boxShadow: string
   border: string

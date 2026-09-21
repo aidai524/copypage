@@ -37,6 +37,25 @@ describe('alignTrees', () => {
     expect(r.extra).toHaveLength(1)
   })
 
+  it('pairs across wrapper divergence (React root div etc.)', () => {
+    const a = node('0', 'body', { x: 0, y: 0, width: 1440, height: 6000 }, [
+      node('0/0', 'nav', { x: 0, y: 48, width: 1440, height: 64 }),
+      node('0/1', 'main', { x: 0, y: 48, width: 1440, height: 5900 }, [
+        { ...node('0/1/0', 'h2', { x: 100, y: 4000, width: 693, height: 44 }), text: '创新故事' },
+      ]),
+    ])
+    const b = node('0', 'body', { x: 0, y: 0, width: 1440, height: 6000 }, [
+      node('0/0', 'div', { x: 0, y: 0, width: 1440, height: 6000 }, [
+        node('0/0/0', 'nav', { x: 0, y: 48, width: 1440, height: 64 }),
+        { ...node('0/0/1', 'h2', { x: 100, y: 3960, width: 693, height: 44 }), text: '创新故事' },
+      ]),
+    ])
+    const r = alignTrees(a, b)
+    const tags = r.pairs.map(([o]) => o.tag)
+    expect(tags).toContain('nav')
+    expect(tags).toContain('h2') // text + horizontal position rescue it across wrappers
+  })
+
   it('idMap forces pairing regardless of position', () => {
     const a = node('0', 'body', { x: 0, y: 0, width: 800, height: 600 }, [
       node('0/0', 'button', { x: 100, y: 200, width: 160, height: 48 }),

@@ -23,7 +23,7 @@ export async function autoScroll(page: Page): Promise<void> {
 const PROBE_SRC = `(maxNodes) => {
   const STYLE_PROPS = [
     'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color',
-    'backgroundColor', 'backgroundImage', 'borderRadius', 'boxShadow', 'border',
+    'backgroundColor', 'backgroundImage', 'backgroundSize', 'backgroundPosition', 'borderRadius', 'boxShadow', 'border',
     'padding', 'margin', 'transform', 'opacity', 'zIndex', 'display', 'position',
   ]
 
