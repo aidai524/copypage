@@ -145,6 +145,12 @@ export function comparePair(orig: ElementNode, repro: ElementNode, pageArea: num
       continue
     }
 
+    // backgroundPosition/Size: 0px == 0% == 0 (browser serialization differs)
+    if (key === 'backgroundPosition' || key === 'backgroundSize') {
+      const norm = (s: string) => s.replace(/\b0px\b/g, '0%').replace(/\s+/g, ' ').trim()
+      if (norm(e) === norm(a)) continue
+    }
+
     // normalized string compare for the rest (boxShadow, transform, fonts…)
     if (e.replace(/\s+/g, ' ').trim() === a.replace(/\s+/g, ' ').trim()) continue
     entries.push(entry(orig, key, e, a, pageArea, 1))
