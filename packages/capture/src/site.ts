@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { writeSnapshot, type DomSnapshot, type Snapshot, type SnapshotMeta } from '@copypage/core'
 import { autoScroll, probeDom } from './probe.js'
+import { downloadAssets } from './assets.js'
 
 export interface CaptureSiteOptions {
   viewports?: number[]
@@ -27,6 +28,7 @@ export async function captureSite(
   await mkdir(path.join(outDir, 'dom'), { recursive: true })
 
   const browser = await chromium.launch()
+  let snapshotAssets: string | undefined
   try {
     const screenshots: Record<string, string> = {}
     const doms: DomSnapshot[] = []
@@ -69,6 +71,15 @@ export async function captureSite(
         }
       })
       await writeFile(path.join(outDir, 'meta.json'), JSON.stringify(meta, null, 2))
+
+      const assets = await downloadAssets(page, outDir)
+      if (assets.failed.length > 0) {
+        await writeFile(
+          path.join(outDir, 'assets-failed.json'),
+          JSON.stringify(assets.failed, null, 2),
+        )
+      }
+      snapshotAssets = assets.files.length > 0 ? 'assets' : undefined
     } finally {
       await page.close()
     }
@@ -78,6 +89,7 @@ export async function captureSite(
       viewports,
       screenshots,
       dom: doms,
+      ...(snapshotAssets ? { assetsDir: snapshotAssets } : {}),
     }
     await writeSnapshot(outDir, snapshot)
   } finally {
