@@ -12,6 +12,8 @@ export interface CaptureSiteOptions {
   viewports?: number[]
   /** page height for each viewport; defaults to 900 */
   viewportHeight?: number
+  /** run interaction-state capture (expensive: N elements × 3 states × screenshot) */
+  states?: boolean
 }
 
 const DEFAULT_VIEWPORTS = [1440, 768, 375]
@@ -91,8 +93,10 @@ export async function captureSite(
 
       const assets = await downloadAssets(page, outDir)
       log(`assets: ${assets.files.length} ok, ${assets.failed.length} failed`)
-      await captureStates(page, outDir)
-      log('states: done')
+      if (opts.states !== false) {
+        await captureStates(page, outDir)
+        log('states: done')
+      }
       const charts = await detectCharts(page)
       log(`charts: ${charts.length} found`)
       if (charts.length > 0) {

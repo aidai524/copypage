@@ -99,10 +99,17 @@ export async function captureVideo(
   await mkdir(framesDir, { recursive: true })
 
   const frames: VideoFrame[] = []
-  for (let i = 0; i < picked.length; i++) {
-    const name = `frames/${String(i).padStart(4, '0')}.png`
-    await grabFrame(file, picked[i], path.join(outDir, name))
-    frames.push({ file: name, t: picked[i] })
+  // limited-parallel extraction: 4 ffmpeg processes at a time (was serial)
+  const POOL = 4
+  for (let i = 0; i < picked.length; i += POOL) {
+    await Promise.all(
+      picked.slice(i, i + POOL).map(async (t, j) => {
+        const idx = i + j
+        const name = `frames/${String(idx).padStart(4, '0')}.png`
+        await grabFrame(file, t, path.join(outDir, name))
+        frames[idx] = { file: name, t }
+      }),
+    )
   }
 
   const snapshot: Snapshot = {
