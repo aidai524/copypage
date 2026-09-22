@@ -34,7 +34,7 @@ export async function freezeDynamic(page: Page): Promise<void> {
     // 2. css animations & transitions
     const style = document.createElement('style')
     style.id = 'cp-freeze'
-    style.textContent = '*, *::before, *::after { animation-play-state: paused !important; transition: none !important; }'
+    style.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }'
     document.head.appendChild(style)
     // 3. videos
     for (const v of Array.from(document.querySelectorAll('video'))) {

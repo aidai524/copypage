@@ -7,6 +7,7 @@ import { downloadAssets } from './assets.js'
 import { captureStates } from './states.js'
 import { detectCharts } from './charts.js'
 import { freezeDynamic, registerTimerHooks } from './freeze.js'
+import { detectAdaptive } from './adaptive.js'
 
 export interface CaptureSiteOptions {
   viewports?: number[]
@@ -53,7 +54,11 @@ export async function captureSite(
         await autoScroll(page)
         await freezeDynamic(page)
         const shotRel = `screenshots/${width}.png`
-        await page.screenshot({ path: path.join(outDir, shotRel), fullPage: true })
+        await page.screenshot({
+          path: path.join(outDir, shotRel),
+          fullPage: true,
+          animations: 'disabled', // jump CSS animations to their end state
+        })
         const root = await probeDom(page)
         log(`viewport ${width}: done`)
         const dom: DomSnapshot = {
@@ -78,6 +83,13 @@ export async function captureSite(
       log('meta pass: loaded, scrolling')
       await autoScroll(page) // lazy assets/charts/interactive elements render on scroll
       await freezeDynamic(page)
+      const adaptive = await detectAdaptive(page)
+      await writeFile(path.join(outDir, 'adaptive.json'), JSON.stringify(adaptive, null, 2))
+      if (adaptive.heightAdaptiveSections.length > 0 || adaptive.fluidFont.enabled) {
+        log(
+          `adaptive: ${adaptive.heightAdaptiveSections.length} vh-sections, fluidFont=${adaptive.fluidFont.enabled}`,
+        )
+      }
       const meta: SnapshotMeta = await page.evaluate(`(() => {
         const favicon = document.querySelector('link[rel~="icon"]')?.href
         const bodyBg = getComputedStyle(document.body).backgroundColor

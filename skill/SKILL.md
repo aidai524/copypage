@@ -52,6 +52,15 @@ echo '{"round":1,"history":[],"escalated":false}' > $TASK/state.json
 
 每个组件文件头注释区域 id 映射：`/** @region 0/1/0 (hero > button.cta) */` — diff 路由回文件靠它。
 
+### 3b. 自适应行为（若 snapshot 有 adaptive.json）
+
+capture 自动探测两类视口自适应，生成时必须按标记处理：
+
+1. **`heightAdaptiveSections`（100vh 类元素）**：这些 section 用 `h-screen`（或 `h-[100svh]`），**禁止写死像素高度**；其内部用 `object-cover` 居中，不要用 object-position 硬调
+2. **`fluidFont.enabled`（rem 流式缩放站）**：所有尺寸按 `perVw` 曲线做视口缩放，典型实现：内容区包 `.fluid-zoom`，CSS 用 `zoom: min(calc(100vw / 1440px), cap)`，cap = `atWide/atBase`。检测方法：两个宽度读 html font-size
+
+没有 adaptive.json 或标记为 false 时，按固定像素还原（捕捉视口即真相）。
+
 ### 4. Render + Diff
 
 ```bash
