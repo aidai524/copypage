@@ -148,6 +148,16 @@ export async function diffSnapshots(
       ssimSum += res.ssim
       ssimN++
       pixelDiffPctMax = Math.max(pixelDiffPctMax, res.pixelDiffPct)
+      if (res.trimmedDelta) {
+        entries.push({
+          id: `d-trim-${width}`,
+          element: 'page',
+          property: 'layout',
+          expected: `screenshot heights equal`,
+          actual: `height differs by ${res.trimmedDelta}px (trimmed for comparison)`,
+          severity: 20,
+        })
+      }
     }
 
     // DOM layer

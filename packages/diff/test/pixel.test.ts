@@ -60,4 +60,24 @@ describe('pixelDiff', () => {
     const res = await pixelDiff(a, b, path.join(dir, 'h3.png'))
     expect(res).toEqual({ layoutError: true })
   })
+
+  it('small height mismatch trims instead of layoutError', async () => {
+    const a = path.join(dir, 'g.png')
+    const b = path.join(dir, 'h.png')
+    solidPng(200, 100, [255, 255, 255, 255], a)
+    solidPng(200, 104, [255, 255, 255, 255], b)
+    const res = await pixelDiff(a, b, path.join(dir, 'h4.png'))
+    if ('layoutError' in res) throw new Error('should have trimmed')
+    expect(res.trimmedDelta).toBe(4)
+    expect(res.ssim).toBeGreaterThan(0.999)
+  })
+
+  it('large height mismatch still layoutError', async () => {
+    const a = path.join(dir, 'i.png')
+    const b = path.join(dir, 'j.png')
+    solidPng(200, 100, [255, 255, 255, 255], a)
+    solidPng(200, 200, [255, 255, 255, 255], b)
+    const res = await pixelDiff(a, b, path.join(dir, 'h5.png'))
+    expect(res).toEqual({ layoutError: true })
+  })
 })
