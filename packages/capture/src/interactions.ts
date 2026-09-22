@@ -46,6 +46,8 @@ export async function discoverInteractions(page: Page): Promise<InteractionFindi
     }).slice(0, ${MAX_CANDIDATES})
     return els.map((el, i) => {
       el.setAttribute('data-cp-cand', String(i))
+      // block default navigation only; other click handlers (tab JS etc.) still run
+      el.addEventListener('click', (e) => e.preventDefault(), true)
       const idPart = el.id ? '#' + el.id : ''
       const cls = Array.from(el.classList).slice(0, 2).map((c) => '.' + c).join('')
       return { selector: el.tagName.toLowerCase() + idPart + cls, text: (el.textContent || '').trim().slice(0, 40) }
@@ -71,8 +73,15 @@ export async function discoverInteractions(page: Page): Promise<InteractionFindi
     }
     await page.waitForTimeout(CLICK_WAIT_MS)
 
-    const after = await textSnapshot()
-    const muts = (await page.evaluate(`window.__cpMuts.length`)) as number
+    let after: string
+    let muts: number
+    try {
+      after = await textSnapshot()
+      muts = (await page.evaluate(`window.__cpMuts ? window.__cpMuts.length : -1`)) as number
+    } catch {
+      continue // page navigated / context destroyed despite preventDefault
+    }
+    if (muts === -1) continue
     if (after === before && muts < 3) continue
 
     // summarize: new visible text fragments
