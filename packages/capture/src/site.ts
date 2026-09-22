@@ -6,6 +6,7 @@ import { autoScroll, probeDom } from './probe.js'
 import { downloadAssets } from './assets.js'
 import { captureStates } from './states.js'
 import { detectCharts } from './charts.js'
+import { discoverInteractions } from './interactions.js'
 import { freezeDynamic, registerTimerHooks } from './freeze.js'
 import { detectAdaptive } from './adaptive.js'
 
@@ -114,6 +115,14 @@ export async function captureSite(
       if (charts.length > 0) {
         await writeFile(path.join(outDir, 'charts.json'), JSON.stringify(charts, null, 2))
         snapshotCharts = 'charts.json'
+      }
+      if (opts.states !== false) {
+        // interaction discovery runs LAST: clicks may leave the page in a changed state
+        const interactions = await discoverInteractions(page)
+        if (interactions.length > 0) {
+          await writeFile(path.join(outDir, 'interactions.json'), JSON.stringify(interactions, null, 2))
+        }
+        log(`interactions: ${interactions.length} clickable triggers found`)
       }
       if (assets.failed.length > 0) {
         await writeFile(

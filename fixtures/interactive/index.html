@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Interactive Fixture</title>
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  .tabs { display: flex; gap: 8px; padding: 20px; }
+  .tab { padding: 12px 20px; border: 1px solid #ccc; cursor: pointer; }
+  .tab.active { background: #000; color: #fff; }
+  .panel { display: none; padding: 40px; }
+  .panel.show { display: block; }
+</style>
+</head>
+<body>
+  <div class="tabs">
+    <div class="tab active" data-panel="p1">Tab One</div>
+    <div class="tab" data-panel="p2">Tab Two</div>
+    <div class="tab" data-panel="p3">Tab Three</div>
+  </div>
+  <div id="p1" class="panel show">Content for panel one</div>
+  <div id="p2" class="panel">Content for panel two</div>
+  <div id="p3" class="panel">Content for panel three</div>
+  <script>
+    document.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'))
+        document.querySelectorAll('.panel').forEach(x => x.classList.remove('show'))
+        t.classList.add('active')
+        document.getElementById(t.dataset.panel).classList.add('show')
+      })
+    })
+  </script>
+</body>
+</html>

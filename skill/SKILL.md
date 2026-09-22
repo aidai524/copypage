@@ -61,6 +61,14 @@ capture 自动探测两类视口自适应，生成时必须按标记处理：
 
 没有 adaptive.json 或标记为 false 时，按固定像素还原（捕捉视口即真相）。
 
+### 3c. 可点击交互（若 snapshot 有 interactions.json）
+
+capture 会逐个点击候选触发器（button / [role=tab] / 分页点等）并用 MutationObserver 记录点击后页面变化。生成时：
+
+- **每条 interaction 都要落地为真实行为**：tab 切换内容、轮播箭头翻页、手风琴展开 —— 不允许只做视觉态
+- 用 `interactions.json` 的 `summary`（点击后新出现的内容）确定每个触发器控制的区域和切换后的文案/图片
+- 没被抓到的交互（interactions.json 为空或无文件）不代表现站没有交互 —— 生成时仍需对“看起来像可点的”元素（tab 状按钮、箭头、分页点）实现合理默认行为
+
 ### 4. Render + Diff
 
 ```bash
