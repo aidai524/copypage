@@ -10,6 +10,8 @@ export interface ComputedStyles {
   fontSize: string
   fontWeight: string
   lineHeight: string
+  letterSpacing: string
+  textAlign: string
   color: string
   backgroundColor: string
   backgroundImage: string

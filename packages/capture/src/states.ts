@@ -16,7 +16,7 @@ const MAX_TARGETS = 50
 // string source — avoids TS transpile helpers leaking into the browser
 const READ_STYLES_SRC = `(el) => {
   const PROPS = [
-    'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'color',
+    'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'textAlign', 'color',
     'backgroundColor', 'backgroundImage', 'backgroundSize', 'backgroundPosition', 'borderRadius', 'boxShadow', 'border',
     'padding', 'margin', 'transform', 'opacity', 'zIndex', 'display', 'position',
     'outline',
