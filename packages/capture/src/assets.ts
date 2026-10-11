@@ -7,6 +7,14 @@ export interface AssetsResult {
   failed: { url: string; reason: string }[]
 }
 
+export interface DownloadAssetsOptions {
+  /** hard wall-clock budget for the whole phase; remaining assets are marked failed */
+  budgetMs?: number
+  /** hard per-asset wall-clock budget including body streaming */
+  perAssetMs?: number
+  concurrency?: number
+}
+
 interface CollectedAsset {
   kind: 'url' | 'svg'
   url?: string
@@ -39,7 +47,14 @@ export function withContentTypeExt(name: string, contentType: string | undefined
 }
 
 /** Collect + download page assets (img/src, favicon links, inline svg) into outDir/assets. */
-export async function downloadAssets(page: Page, outDir: string): Promise<AssetsResult> {
+export async function downloadAssets(
+  page: Page,
+  outDir: string,
+  opts: DownloadAssetsOptions = {},
+): Promise<AssetsResult> {
+  const budgetMs = opts.budgetMs ?? 120_000
+  const perAssetMs = opts.perAssetMs ?? 12_000
+  const deadline = Date.now() + budgetMs
   const assetsDir = path.join(outDir, 'assets')
   await mkdir(assetsDir, { recursive: true })
 
@@ -88,38 +103,58 @@ export async function downloadAssets(page: Page, outDir: string): Promise<Assets
       files.push(rel)
       return
     }
+    if (Date.now() > deadline) {
+      failed.push({ url: asset.url!, reason: 'assets budget exceeded' })
+      return
+    }
     try {
-      const res = await page.request.get(asset.url!, {
-        headers: { referer: page.url() },
-        timeout: 12000,
+      // page.request timeout only covers response headers; a throttled body
+      // stream can hang forever, so race the whole read with a hard timer
+      const { buf: body, ctype } = await new Promise<{ buf: Buffer; ctype: string | undefined }>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`asset timed out after ${perAssetMs}ms`)), perAssetMs)
+        void (async () => {
+          try {
+            const res = await page.request.get(asset.url!, {
+              headers: { referer: page.url() },
+              timeout: perAssetMs,
+            })
+            if (!res.ok()) {
+              clearTimeout(timer)
+              reject(new Error(`http ${res.status()}`))
+              return
+            }
+            const len = Number(res.headers()['content-length'] ?? '0')
+            if (len > MAX_ASSET_BYTES) {
+              clearTimeout(timer)
+              reject(new Error(`too large (${Math.round(len / 1024 / 1024)}MB)`))
+              return
+            }
+            const buf = await res.body()
+            clearTimeout(timer)
+            resolve({ buf, ctype: res.headers()['content-type'] })
+          } catch (err) {
+            clearTimeout(timer)
+            reject(err instanceof Error ? err : new Error(String(err)))
+          }
+        })()
       })
-      if (!res.ok()) {
-        failed.push({ url: asset.url!, reason: `http ${res.status()}` })
-        return
-      }
-      const len = Number(res.headers()['content-length'] ?? '0')
-      if (len > MAX_ASSET_BYTES) {
-        failed.push({ url: asset.url!, reason: `too large (${Math.round(len / 1024 / 1024)}MB)` })
-        return
-      }
-      const body = await res.body()
       if (body.length > MAX_ASSET_BYTES) {
         failed.push({ url: asset.url!, reason: `too large (${Math.round(body.length / 1024 / 1024)}MB)` })
         return
       }
       // pump.fun-style proxies serve extension-less URLs; repair from content-type
-      const finalName = withContentTypeExt(asset.suggestedName, res.headers()['content-type'])
+      const finalName = withContentTypeExt(asset.suggestedName, ctype)
       const finalRel = path.join('assets', finalName)
       await writeFile(path.join(outDir, finalRel), body)
       files.push(finalRel)
     } catch (err) {
-      failed.push({ url: asset.url!, reason: String(err).slice(0, 200) })
+      failed.push({ url: asset.url!, reason: String(err instanceof Error ? err.message : err).slice(0, 200) })
     }
   }
 
   // bounded concurrency: IPFS-hosted images can take seconds each, and 200+
   // assets serialized turn a capture into a multi-minute stall
-  const CONCURRENCY = 8
+  const CONCURRENCY = opts.concurrency ?? 8
   let cursor = 0
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, collected.length) }, async () => {

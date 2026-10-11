@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CopyPage · 捕获服务</title>
+<style>
+  :root {
+    --bg: #0b0b0e;
+    --panel: #131316;
+    --panel-2: #1b1b1f;
+    --border: #232327;
+    --text: #e4e4e7;
+    --dim: #a1a1aa;
+    --faint: #71717a;
+    --green: #4ade80;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    height: 52px; padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; }
+  header .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--green); }
+  header .meta { margin-left: auto; color: var(--faint); font-size: 12px; }
+  main { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; padding: 20px; align-items: start; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin: 0; padding: 14px 16px 8px; }
+  form { padding: 0 16px 16px; display: grid; gap: 10px; }
+  label { display: grid; gap: 6px; font-size: 12px; color: var(--dim); }
+  input[type=text], select {
+    width: 100%; height: 34px; padding: 0 10px;
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font: inherit;
+  }
+  input[type=text]:focus, select:focus { outline: 1px solid var(--blue); border-color: transparent; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .checks { display: flex; gap: 14px; font-size: 12px; color: var(--dim); }
+  .checks label { display: flex; align-items: center; gap: 6px; }
+  button {
+    height: 34px; padding: 0 14px; border: 0; border-radius: 6px;
+    background: var(--green); color: #052e16; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+  .tasks { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; gap: 4px; max-height: 60vh; overflow: auto; }
+  .tasks li {
+    padding: 9px 10px; border-radius: 8px; cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .tasks li:hover { background: var(--panel-2); }
+  .tasks li.active { background: var(--panel-2); border-color: var(--border); }
+  .tasks .line1 { display: flex; align-items: center; gap: 8px; }
+  .tasks .src { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .tasks .time { color: var(--faint); font-size: 11px; }
+  .chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+  .chip.queued { background: rgba(251,191,36,.15); color: var(--amber); }
+  .chip.running { background: rgba(96,165,250,.15); color: var(--blue); }
+  .chip.done { background: rgba(74,222,128,.15); color: var(--green); }
+  .chip.failed { background: rgba(248,113,113,.15); color: var(--red); }
+  .detail { padding: 16px; }
+  .detail .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .detail .head h3 { margin: 0; font-size: 15px; word-break: break-all; }
+  .detail .id { color: var(--faint); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 14px 0; }
+  .cell { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
+  .cell .k { font-size: 11px; color: var(--faint); }
+  .cell .v { font-size: 14px; margin-top: 2px; word-break: break-all; }
+  .log {
+    background: #0e0e11; border: 1px solid var(--border); border-radius: 8px;
+    font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--dim); max-height: 210px; overflow: auto; padding: 10px 12px; white-space: pre-wrap;
+  }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 12px; }
+  .shot { background: var(--panel-2); border-radius: 8px; overflow: hidden; }
+  .shot .bar { display: flex; align-items: center; padding: 8px 10px; font-size: 12px; color: var(--dim); }
+  .shot .bar a { margin-left: auto; color: var(--blue); text-decoration: none; font-size: 12px; }
+  .shot img { display: block; width: 100%; max-height: 320px; object-fit: cover; object-position: top; background: #000; }
+  .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .links a {
+    font-size: 12px; color: var(--dim); text-decoration: none;
+    border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; background: var(--panel-2);
+  }
+  .links a:hover { color: var(--text); border-color: var(--faint); }
+  .error { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(248,113,113,.12); color: var(--red); font-size: 13px; }
+  .hint { color: var(--faint); padding: 28px 4px; }
+  section.panel { min-height: 200px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot"></span>
+  <h1>CopyPage · 捕获服务</h1>
+  <span class="meta" id="health">…</span>
+</header>
+
+<main>
+  <aside class="panel">
+    <h2>新建捕获</h2>
+    <form id="new-task">
+      <div class="row">
+        <select id="type" style="width:110px">
+          <option value="url">URL</option>
+          <option value="image">图片路径</option>
+          <option value="video">视频路径</option>
+        </select>
+        <input type="text" id="source" placeholder="https://example.com" required />
+      </div>
+      <label>视口宽度（逗号分隔）
+        <input type="text" id="viewports" value="1440,768,375" />
+      </label>
+      <div class="checks">
+        <label><input type="checkbox" id="dynamic" checked /> 动态区域检测</label>
+        <label><input type="checkbox" id="states" /> 交互态捕获（慢）</label>
+      </div>
+      <div class="row">
+        <label style="flex:1">DOM 节点上限
+          <input type="text" id="maxNodes" value="4000" />
+        </label>
+        <button type="submit" id="submit">开始捕获</button>
+      </div>
+    </form>
+    <h2>任务</h2>
+    <ul class="tasks" id="tasks"></ul>
+  </aside>
+
+  <section class="panel" id="detail">
+    <p class="hint">创建或选择一个任务查看详情。</p>
+  </section>
+</main>
+
+<script>
+  const $ = (s) => document.querySelector(s)
+  const state = { tasks: [], selected: null }
+  const STATUS = { queued: '排队中', running: '捕获中', done: '完成', failed: '失败' }
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('zh-CN', { hour12: false }) }
+  const fmtDuration = (ms) => (ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms')
+
+  function upsert(task) {
+    const i = state.tasks.findIndex((t) => t.id === task.id)
+    if (i >= 0) state.tasks[i] = task
+    else state.tasks.unshift(task)
+  }
+
+  function renderTasks() {
+    const el = $('#tasks')
+    if (state.tasks.length === 0) { el.innerHTML = '<li class="hint" style="padding:6px 10px">暂无任务</li>'; return }
+    el.innerHTML = state.tasks.map((t) => `
+      <li data-id="${t.id}" class="${state.selected === t.id ? 'active' : ''}">
+        <div class="line1">
+          <span class="src">${esc(t.input.source)}</span>
+          <span class="chip ${t.status}">${STATUS[t.status]}</span>
+        </div>
+        <div class="line1">
+          <span class="time">${esc(t.id)} · ${fmtTime(t.createdAt)}</span>
+        </div>
+      </li>`).join('')
+    for (const li of el.querySelectorAll('li[data-id]')) {
+      li.onclick = () => { state.selected = li.dataset.id; renderTasks(); renderDetail() }
+    }
+  }
+
+  function artifactUrl(task, rel) { return `/api/tasks/${task.id}/artifacts/${rel}` }
+
+  function renderDetail() {
+    const el = $('#detail')
+    const t = state.tasks.find((x) => x.id === state.selected)
+    if (!t) { el.innerHTML = '<p class="hint">创建或选择一个任务查看详情。</p>'; return }
+
+    const r = t.result
+    const cells = [
+      r?.title ? ['页面标题', esc(r.title)] : null,
+      ['状态', `<span class="chip ${t.status}">${STATUS[t.status]}</span>`],
+      ['耗时', r ? fmtDuration(r.durationMs) : '—'],
+      ['视口', r ? r.viewports.join(', ') : (t.options.viewports || []).join(', ') || '默认'],
+      r ? ['DOM 节点', r.domNodes ?? '—'] : null,
+      r ? ['资产', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`] : null,
+      r ? ['动态区域', `${r.dynamicRegions} 处`] : null,
+      r ? ['自动关闭弹窗', r.dismissed] : null,
+    ].filter(Boolean)
+
+    const shots = r ? Object.entries(r.screenshots).map(([w, rel]) => `
+      <div class="shot">
+        <div class="bar"><span>${w}px 全页截图</span><a href="${artifactUrl(t, rel)}" target="_blank">打开原图 ↗</a></div>
+        <a href="${artifactUrl(t, rel)}" target="_blank"><img loading="lazy" src="${artifactUrl(t, rel)}" alt="" /></a>
+      </div>`).join('') : ''
+
+    const links = r ? [
+      ['snapshot.json', 'snapshot.json'],
+      ['meta.json', 'meta.json'],
+      ['dynamic.json', 'dynamic.json'],
+      ['dismissed.json', 'dismissed.json'],
+      ['assets-failed.json', 'assets-failed.json'],
+      ...r.viewports.map((w) => [`dom/${w}.json`, `dom/${w}.json`]),
+    ].map(([label, rel]) => `<a href="${artifactUrl(t, rel)}" target="_blank">${esc(label)}</a>`).join('') : ''
+
+    const progress = t.progress.length
+      ? t.progress.map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')
+      : '（等待进度输出…）'
+
+    el.innerHTML = `
+      <div class="detail">
+        <div class="head">
+          <h3>${esc(t.input.source)}</h3>
+          <span class="id">${esc(t.id)}</span>
+        </div>
+        <div class="grid">
+          ${cells.map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
+        </div>
+        ${t.error ? `<div class="error">${esc(t.error)}</div>` : ''}
+        <h2 style="padding:6px 0 8px">进度</h2>
+        <div class="log" id="log">${progress}</div>
+        ${shots ? `<h2 style="padding:18px 0 0">截图</h2><div class="shots">${shots}</div>` : ''}
+        ${links ? `<div class="links">${links}</div>` : ''}
+      </div>`
+    const log = $('#log')
+    if (log) log.scrollTop = log.scrollHeight
+  }
+
+  async function refresh() {
+    const data = await (await fetch('/api/tasks')).json()
+    state.tasks = data.tasks
+    if (!state.selected && state.tasks.length > 0) state.selected = state.tasks[0].id
+    $('#health').textContent = `队列 ${data.queue} · 任务 ${state.tasks.length}`
+    renderTasks(); renderDetail()
+  }
+
+  $('#new-task').addEventListener('submit', async (ev) => {
+    ev.preventDefault()
+    const btn = $('#submit')
+    btn.disabled = true
+    try {
+      const viewports = $('#viewports').value.split(',').map((s) => Number(s.trim())).filter(Boolean)
+      const body = {
+        type: $('#type').value,
+        source: $('#source').value.trim(),
+        options: {
+          viewports,
+          maxNodes: Number($('#maxNodes').value) || 4000,
+          dynamic: $('#dynamic').checked,
+          states: $('#states').checked,
+        },
+      }
+      const res = await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || res.statusText)
+      upsert(data.task); state.selected = data.task.id
+      renderTasks(); renderDetail()
+    } catch (err) {
+      alert('创建任务失败：' + err.message)
+    } finally {
+      btn.disabled = false
+    }
+  })
+
+  const events = new EventSource('/api/events')
+  events.addEventListener('task', (ev) => {
+    const task = JSON.parse(ev.data)
+    upsert(task)
+    if (state.selected === task.id) renderDetail()
+    renderTasks()
+    fetch('/api/health').then((r) => r.json()).then((h) => { $('#health').textContent = `队列 ${h.queue} · 任务 ${h.tasks}` }).catch(() => {})
+  })
+
+  refresh()
+</script>
+</body>
+</html>

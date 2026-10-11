@@ -1,0 +1,13 @@
+{
+  "name": "@copypage/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@copypage/core": "*",
+    "@copypage/capture": "*"
+  }
+}

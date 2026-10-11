@@ -59,4 +59,14 @@ describe('downloadAssets', () => {
     expect(withContentTypeExt('3-icon.svg', 'image/svg+xml; charset=utf-8')).toBe('3-icon.svg')
     expect(withContentTypeExt('9-weird', 'application/octet-stream')).toBe('9-weird')
   })
+
+  it('respects the asset budget and reports skipped downloads', async () => {
+    const page = await browser.newPage()
+    await page.goto(server.url)
+    const tight = await downloadAssets(page, await mkdtemp(path.join(tmpdir(), 'cp-assets-budget-')), {
+      budgetMs: 1,
+    })
+    await page.close()
+    expect(tight.failed.some((f) => f.reason.includes('budget exceeded'))).toBe(true)
+  })
 })

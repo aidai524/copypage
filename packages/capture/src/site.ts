@@ -26,11 +26,13 @@ export interface CaptureSiteOptions {
   dynamic?: boolean
   /** dynamic-region sampling window per viewport; default 2500ms */
   dynamicDurationMs?: number
+  /** progress reporter (server job queue / CLI); defaults to stderr */
+  onProgress?: (message: string) => void
+  /** hard wall-clock budget for asset downloading; remaining assets are marked failed */
+  assetsBudgetMs?: number
 }
 
 const DEFAULT_VIEWPORTS = [1440, 768, 375]
-
-const log = (msg: string) => console.error(`[capture] ${msg}`)
 
 /**
  * Capture a live URL: per-viewport full-page screenshot + DOM snapshot,
@@ -43,6 +45,10 @@ export async function captureSite(
 ): Promise<void> {
   const viewports = opts.viewports ?? DEFAULT_VIEWPORTS
   const height = opts.viewportHeight ?? 900
+  const log = (msg: string) => {
+    if (opts.onProgress) opts.onProgress(msg)
+    else console.error(`[capture] ${msg}`)
+  }
   await mkdir(path.join(outDir, 'screenshots'), { recursive: true })
   await mkdir(path.join(outDir, 'dom'), { recursive: true })
 
@@ -138,7 +144,7 @@ export async function captureSite(
       })()`) as SnapshotMeta
       await writeFile(path.join(outDir, 'meta.json'), JSON.stringify(meta, null, 2))
 
-      const assets = await downloadAssets(page, outDir)
+      const assets = await downloadAssets(page, outDir, { budgetMs: opts.assetsBudgetMs })
       log(`assets: ${assets.files.length} ok, ${assets.failed.length} failed`)
       if (opts.states !== false) {
         // reopen the data gate so hover/click captures can trigger app behavior
