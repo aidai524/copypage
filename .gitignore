@@ -3,3 +3,5 @@ work/
 dist/
 .env
 .superpowers/
+.mise.local.toml
+mise.local.toml
