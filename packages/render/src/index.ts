@@ -58,8 +58,9 @@ export async function captureRepro(
   const serveDir = (await exists(path.join(distDir, 'index.html'))) ? distDir : reproDir
   const server = await serveStatic(serveDir)
   try {
-    // states capture is expensive — skip when probing the repro mid-loop
-  await captureSite(server.url, outDir, { states: false, ...opts })
+    // states capture is expensive — skip when probing the repro mid-loop.
+    // dynamic-region sampling is for live originals: the repro is static by design.
+    await captureSite(server.url, outDir, { states: false, dynamic: false, ...opts })
   } finally {
     await server.close()
   }

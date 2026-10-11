@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { readSnapshot, type DomSnapshot, type Snapshot } from '@copypage/core'
-import { pixelDiff } from './pixel.js'
+import { pixelDiff, type Rect } from './pixel.js'
 import { alignTrees } from './align.js'
 import { comparePair, resetEntryCounter, type DiffEntry } from './compare.js'
 import { cropPng, diffRegions } from './crops.js'
@@ -9,6 +9,8 @@ import { cropPng, diffRegions } from './crops.js'
 export interface DiffMetrics {
   ssim: number
   pixelDiffPct: number
+  /** share of the viewport excluded as dynamic (live) content, when masks exist */
+  dynamicAreaPct?: number
 }
 
 export interface DiffResult {
@@ -29,6 +31,28 @@ async function readDom(dir: string, width: number): Promise<DomSnapshot | undefi
   } catch {
     return undefined
   }
+}
+
+/** dynamic.json maps viewport width -> live regions recorded at capture time. */
+async function readDynamic(dir: string, width: number): Promise<Rect[]> {
+  try {
+    const map = JSON.parse(await readFile(path.join(dir, 'dynamic.json'), 'utf8')) as Record<
+      string,
+      { box: Rect }[]
+    >
+    return (map[String(width)] ?? []).map((r) => r.box)
+  } catch {
+    return []
+  }
+}
+
+function overlapArea(a: Rect, bbox: [number, number, number, number]): number {
+  const [bx, by, bw, bh] = bbox
+  const x0 = Math.max(a.x, bx)
+  const y0 = Math.max(a.y, by)
+  const x1 = Math.min(a.x + a.width, bx + bw)
+  const y1 = Math.min(a.y + a.height, by + bh)
+  return Math.max(0, x1 - x0) * Math.max(0, y1 - y0)
 }
 
 /**
@@ -52,6 +76,7 @@ export async function diffSnapshots(
   let ssimSum = 0
   let ssimN = 0
   let pixelDiffPctMax = 0
+  let dynamicAreaPctMax = 0
 
   const viewports = orig.viewports.length ? orig.viewports : repro.viewports
 
@@ -126,7 +151,9 @@ export async function diffSnapshots(
     if (!aShot || !bShot) continue
 
     const heatRel = `heatmap-${width}.png`
-    const res = await pixelDiff(path.join(origDir, aShot), path.join(reproDir, bShot), path.join(outDir, heatRel))
+    // live regions from either side (orig capture records them; repro normally has none)
+    const masks = [...(await readDynamic(origDir, width)), ...(await readDynamic(reproDir, width))]
+    const res = await pixelDiff(path.join(origDir, aShot), path.join(reproDir, bShot), path.join(outDir, heatRel), { masks })
 
     let pixelOk = true
     if ('layoutError' in res) {
@@ -148,6 +175,9 @@ export async function diffSnapshots(
       ssimSum += res.ssim
       ssimN++
       pixelDiffPctMax = Math.max(pixelDiffPctMax, res.pixelDiffPct)
+      if (res.dynamicAreaPct !== undefined) {
+        dynamicAreaPctMax = Math.max(dynamicAreaPctMax, res.dynamicAreaPct)
+      }
       if (res.trimmedDelta) {
         entries.push({
           id: `d-trim-${width}`,
@@ -193,6 +223,9 @@ export async function diffSnapshots(
       const regions = await diffRegions(path.join(outDir, heatRel))
       for (let i = 0; i < Math.min(regions.length, 20); i++) {
         const rg = regions[i]
+        // skip crops that are mostly live/dynamic content
+        const cropArea = rg.bbox[2] * rg.bbox[3]
+        if (masks.some((m) => overlapArea(m, rg.bbox) > cropArea * 0.3)) continue
         const id = `vlm-${width}-${i}`
         const cropRel = `crops/${id}-orig.png`
         const reproCropRel = `crops/${id}-repro.png`
@@ -214,6 +247,7 @@ export async function diffSnapshots(
   const metrics: DiffMetrics = {
     ssim: ssimN ? +(ssimSum / ssimN).toFixed(4) : 0,
     pixelDiffPct: +pixelDiffPctMax.toFixed(2),
+    ...(dynamicAreaPctMax > 0 ? { dynamicAreaPct: dynamicAreaPctMax } : {}),
   }
 
   entries.sort((a, b) => b.severity - a.severity)

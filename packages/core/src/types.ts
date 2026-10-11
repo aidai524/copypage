@@ -81,4 +81,6 @@ export interface Snapshot {
   charts?: string
   /** path to dismissed.json relative to snapshot dir (overlays auto-closed during capture) */
   dismissed?: string
+  /** path to dynamic.json relative to snapshot dir (live regions sampled during capture) */
+  dynamic?: string
 }

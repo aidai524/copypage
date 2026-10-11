@@ -53,12 +53,19 @@ const PROBE_SRC = `(maxNodes) => {
     const styles = {}
     for (const p of STYLE_PROPS) styles[p] = cs[p] ?? ''
 
+    // own text only, preserving line breaks: apps render multi-line posts with
+    // <br> / separate text nodes inside whitespace-pre-wrap paragraphs
     const ownText = Array.from(el.childNodes)
-      .filter((n) => n.nodeType === Node.TEXT_NODE)
-      .map((n) => (n.textContent ?? '').trim())
-      .filter(Boolean)
-      .join(' ')
-      .slice(0, 80)
+      .map((n) => {
+        if (n.nodeType === Node.TEXT_NODE) return n.textContent || ''
+        if (n.nodeName === 'BR') return '\\n'
+        return ''
+      })
+      .join('')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\\n{3,}/g, '\\n\\n')
+      .trim()
+      .slice(0, 200)
 
     const children = []
     Array.from(el.children).forEach((child, i) => {

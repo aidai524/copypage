@@ -7,7 +7,8 @@ import { downloadAssets } from './assets.js'
 import { captureStates } from './states.js'
 import { detectCharts } from './charts.js'
 import { discoverInteractions } from './interactions.js'
-import { freezeDynamic, registerTimerHooks } from './freeze.js'
+import { freezeDynamic, registerTimerHooks, unfreezeDynamic } from './freeze.js'
+import { detectDynamicRegions, type DynamicRegion } from './dynamic.js'
 import { detectAdaptive } from './adaptive.js'
 import { dismissOverlays, type Dismissal } from './dismiss.js'
 
@@ -21,6 +22,10 @@ export interface CaptureSiteOptions {
   dismiss?: boolean
   /** DOM probe node budget; raise for large live feeds (default 4000) */
   maxNodes?: number
+  /** sample the live page for mutations and record dynamic regions; default true */
+  dynamic?: boolean
+  /** dynamic-region sampling window per viewport; default 2500ms */
+  dynamicDurationMs?: number
 }
 
 const DEFAULT_VIEWPORTS = [1440, 768, 375]
@@ -45,7 +50,9 @@ export async function captureSite(
   let snapshotAssets: string | undefined
   let snapshotCharts: string | undefined
   let snapshotDismissed: string | undefined
+  let snapshotDynamic: string | undefined
   const allDismissals: Dismissal[] = []
+  const dynamicByViewport: Record<string, DynamicRegion[]> = {}
   try {
     const screenshots: Record<string, string> = {}
     const doms: DomSnapshot[] = []
@@ -65,6 +72,14 @@ export async function captureSite(
         await autoScroll(page)
         if (opts.dismiss !== false) {
           allDismissals.push(...(await dismissOverlays(page)))
+        }
+        // sample live mutations BEFORE freezing: a frozen page drives no diffs
+        if (opts.dynamic !== false) {
+          const regions = await detectDynamicRegions(page, { durationMs: opts.dynamicDurationMs })
+          if (regions.length > 0) {
+            dynamicByViewport[String(width)] = regions
+            log(`dynamic: ${regions.length} regions @${width}`)
+          }
         }
         await freezeDynamic(page)
         const shotRel = `screenshots/${width}.png`
@@ -126,6 +141,8 @@ export async function captureSite(
       const assets = await downloadAssets(page, outDir)
       log(`assets: ${assets.files.length} ok, ${assets.failed.length} failed`)
       if (opts.states !== false) {
+        // reopen the data gate so hover/click captures can trigger app behavior
+        await unfreezeDynamic(page)
         await captureStates(page, outDir)
         log('states: done')
       }
@@ -156,6 +173,15 @@ export async function captureSite(
         )
         snapshotDismissed = 'dismissed.json'
       }
+      if (Object.keys(dynamicByViewport).length > 0) {
+        await writeFile(
+          path.join(outDir, 'dynamic.json'),
+          JSON.stringify(dynamicByViewport, null, 2),
+        )
+        snapshotDynamic = 'dynamic.json'
+        const masked = Object.values(dynamicByViewport).flat()
+        log(`dynamic: ${masked.length} regions recorded across viewports`)
+      }
       snapshotAssets = assets.files.length > 0 ? 'assets' : undefined
     } finally {
       await page.close()
@@ -169,6 +195,7 @@ export async function captureSite(
       ...(snapshotAssets ? { assetsDir: snapshotAssets } : {}),
       ...(snapshotCharts ? { charts: snapshotCharts } : {}),
       ...(snapshotDismissed ? { dismissed: snapshotDismissed } : {}),
+      ...(snapshotDynamic ? { dynamic: snapshotDynamic } : {}),
     }
     await writeSnapshot(outDir, snapshot)
   } finally {

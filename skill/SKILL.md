@@ -69,6 +69,16 @@ capture 会逐个点击候选触发器（button / [role=tab] / 分页点等）�
 - 用 `interactions.json` 的 `summary`（点击后新出现的内容）确定每个触发器控制的区域和切换后的文案/图片
 - 没被抓到的交互（interactions.json 为空或无文件）不代表现站没有交互 —— 生成时仍需对“看起来像可点的”元素（tab 状按钮、箭头、分页点）实现合理默认行为
 
+### 3d. 实时数据（若 snapshot 有 dynamic.json）
+
+capture 会先采样 2.5s 的 DOM 变更（文本更新 / 节点增删），把**固有动态区域**（行情、时间戳、live feed）记录到 `dynamic.json`（按视口存储）。随后冻结数据流（WebSocket / EventSource / fetch / XHR / timer / rAF）再截图 + 探测，保证截图与 DOM 来自同一状态。
+
+生成与校验规则：
+
+1. 动态区域只需**结构与静态样式**正确；文案/金额用快照值即可，不要试图复现实时数据
+2. diff 自动按 dynamic.json 做像素遮罩（热力图中蓝色标注）：`ssim` / `pixelDiffPct` 只统计静态区域，`metrics.dynamicAreaPct` 是被遮罩占比
+3. `dynamicAreaPct` > 60% 说明页面几乎整体动态，先人工确认还原范围再进入循环
+
 ### 4. Render + Diff
 
 ```bash
@@ -78,6 +88,7 @@ npm run diff -- --orig $TASK/orig --repro $TASK/repro-snap --out $TASK/diffs/r<N
 
 - **build 失败**：把报错原文当作 severity=∞ 的 diff 条目，本轮必修
 - **有 vlm-requests.json**：用 vlmChat 处理每条（crop=原站，reproCrop=还原），把返回的 JSON 数组合并为 diff 条目（结构同 diff.json entries）
+- **metrics.dynamicAreaPct**：被遮罩的动态区域占比；收敛阈值只对静态区域生效
 
 ### 5. 收敛判定
 
