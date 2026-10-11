@@ -97,6 +97,28 @@
   .error { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(248,113,113,.12); color: var(--red); font-size: 13px; }
   .hint { color: var(--faint); padding: 28px 4px; }
   section.panel { min-height: 200px; }
+  .vform { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0 14px; }
+  .vform input[type=text] { flex: 1; min-width: 240px; }
+  .vform .note { color: var(--faint); font-size: 12px; width: 100%; }
+  .vrun { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--panel-2); }
+  .vrun .vhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .vrun .vhead b { font-size: 13px; }
+  .vrun .vhead .time { color: var(--faint); font-size: 11px; }
+  .vrun .vhead .spacer { flex: 1; }
+  .vmetrics { display: flex; gap: 18px; margin: 10px 0 6px; flex-wrap: wrap; }
+  .vmetrics .m { font-size: 12px; color: var(--faint); }
+  .vmetrics .m b { display: block; font-size: 17px; color: var(--text); }
+  .vlinks a { font-size: 12px; color: var(--blue); text-decoration: none; margin-right: 12px; }
+  .vlog { background: #0e0e11; border-radius: 6px; margin-top: 8px; padding: 8px 10px; font: 11px/1.6 ui-monospace, monospace; color: var(--dim); max-height: 120px; overflow: auto; white-space: pre-wrap; }
+  .entries { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+  .entries th, .entries td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .entries th { color: var(--faint); font-weight: 500; }
+  .entries .sev { color: var(--amber); }
+  .entries .exp { color: var(--green); } .entries .act { color: var(--red); }
+  .chip.pass { background: rgba(74,222,128,.15); color: var(--green); }
+  .chip.continue { background: rgba(96,165,250,.15); color: var(--blue); }
+  .chip.escalate { background: rgba(251,191,36,.15); color: var(--amber); }
+  .chip.stagnant-stop, .chip.cap-stop { background: rgba(248,113,113,.15); color: var(--red); }
 </style>
 </head>
 <body>
@@ -145,6 +167,8 @@
   const $ = (s) => document.querySelector(s)
   const state = { tasks: [], selected: null }
   const STATUS = { queued: '排队中', running: '捕获中', done: '完成', failed: '失败' }
+  const VSTATUS = { queued: '排队中', running: '验证中', done: '完成', failed: '失败' }
+  const DECISION = { pass: '通过', continue: '继续迭代', escalate: '升级诊断', 'stagnant-stop': '停滞终止', 'cap-stop': '轮次上限' }
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
   const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('zh-CN', { hour12: false }) }
@@ -175,11 +199,114 @@
   }
 
   function artifactUrl(task, rel) { return `/api/tasks/${task.id}/artifacts/${rel}` }
+  function fileUrl(task, rel) { return `/api/tasks/${task.id}/files/${rel}` }
+
+  function renderVerifications(t) {
+    if (t.status !== 'done') return ''
+    const runs = [...(t.verifications || [])].reverse()
+    const runsHtml = runs
+      .map((v) => {
+        const r = v.result
+        const metrics = r
+          ? `<div class="vmetrics">
+               <div class="m">SSIM<b>${r.metrics.ssim}</b></div>
+               <div class="m">像素差异<b>${r.metrics.pixelDiffPct}%</b></div>
+               ${r.metrics.dynamicAreaPct !== undefined ? `<div class="m">动态区域<b>${r.metrics.dynamicAreaPct}%</b></div>` : ''}
+               <div class="m">差异条目<b>${r.entries}</b></div>
+               <div class="m">耗时<b>${fmtDuration(r.durationMs)}</b></div>
+             </div>`
+          : ''
+        const links = r
+          ? `<div class="vlinks">
+               <a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.report)}" target="_blank">对比报告 ↗</a>
+               ${r.heatmaps.map((h) => `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + h)}" target="_blank">热力图 ${h.match(/heatmap-(\d+)/)?.[1] ?? ''}px ↗</a>`).join('')}
+               ${r.vlmRequests ? `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.vlmRequests)}" target="_blank">VLM 请求队列 ↗</a>` : ''}
+             </div>`
+          : ''
+        const entries = r && r.topEntries.length
+          ? `<table class="entries">
+               <thead><tr><th>severity</th><th>元素</th><th>属性</th><th>原站</th><th>还原</th></tr></thead>
+               <tbody>${r.topEntries.map((e) => `<tr><td class="sev">${e.severity}</td><td>${esc(e.element)}</td><td>${esc(e.property)}</td><td class="exp">${esc(e.expected)}</td><td class="act">${esc(e.actual)}</td></tr>`).join('')}</tbody>
+             </table>`
+          : ''
+        const log = v.progress.length
+          ? `<div class="vlog">${v.progress.map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')}</div>`
+          : ''
+        return `<div class="vrun" data-vid="${v.id}">
+          <div class="vhead">
+            <b>第 ${v.round} 轮</b>
+            <span class="chip ${v.status}">${VSTATUS[v.status]}</span>
+            ${r ? `<span class="chip ${r.decision}">${DECISION[r.decision] || r.decision}</span>` : ''}
+            <span class="time">${esc(v.repro.type)}: ${esc(v.repro.source)} · ${fmtTime(v.createdAt)}</span>
+          </div>
+          ${v.error ? `<div class="error">${esc(v.error)}</div>` : ''}
+          ${metrics}${links}${entries}${log}
+        </div>`
+      })
+      .join('')
+
+    const history = (t.loop?.history || []).length
+      ? `<div class="note" style="color:var(--faint);font-size:12px;margin-bottom:8px">收敛历史：${t.loop.history.map((h, i) => `r${i + 1} ${h.ssim}/${h.pixelDiffPct}%`).join(' → ')}${t.loop.escalated ? ' · 已升级诊断' : ''}</div>`
+      : ''
+
+    return `
+      <h2 style="padding:18px 0 0">验证还原页</h2>
+      <div class="vform">
+        <input type="text" id="verify-path" placeholder="还原工程目录（服务器本地路径，如 work/…/repro）" />
+        <button id="verify-path-btn">验证路径</button>
+        <button class="ghost" id="verify-zip-btn">上传 zip 并验证</button>
+        <input type="file" id="verify-zip" accept=".zip" style="display:none" />
+        <div class="note">流水线与本地完全一致：captureRepro（构建 + 同一探测脚本）→ diff（动态区域遮罩）→ 报告 → 收敛判定</div>
+      </div>
+      ${history}
+      ${runsHtml || '<p class="hint" style="padding:0">还没有验证记录</p>'}`
+  }
+
+  function wireVerification(t) {
+    const pathInput = $('#verify-path')
+    const pathBtn = $('#verify-path-btn')
+    const zipBtn = $('#verify-zip-btn')
+    const zipInput = $('#verify-zip')
+    if (!pathBtn || !zipBtn) return
+
+    const post = async (body, headers = {}) => {
+      const res = await fetch(`/api/tasks/${t.id}/verifications`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || res.statusText)
+      return data
+    }
+
+    pathBtn.onclick = async () => {
+      const source = pathInput.value.trim()
+      if (!source) return alert('请输入还原工程路径')
+      pathBtn.disabled = true
+      try {
+        const data = await post(JSON.stringify({ repro: { type: 'path', source } }))
+        upsert(data.task); renderTasks(); renderDetail()
+      } catch (err) { alert('验证失败：' + err.message) } finally { pathBtn.disabled = false }
+    }
+
+    zipBtn.onclick = () => zipInput.click()
+    zipInput.onchange = async () => {
+      const file = zipInput.files && zipInput.files[0]
+      if (!file) return
+      zipBtn.disabled = true
+      try {
+        const data = await post(file, { 'content-type': 'application/zip', 'x-filename': file.name })
+        upsert(data.task); renderTasks(); renderDetail()
+      } catch (err) { alert('上传失败：' + err.message) } finally { zipBtn.disabled = false; zipInput.value = '' }
+    }
+  }
 
   function renderDetail() {
     const el = $('#detail')
     const t = state.tasks.find((x) => x.id === state.selected)
     if (!t) { el.innerHTML = '<p class="hint">创建或选择一个任务查看详情。</p>'; return }
+    const keepPath = $('#verify-path') ? $('#verify-path').value : ''
 
     const r = t.result
     const cells = [
@@ -226,7 +353,10 @@
         <div class="log" id="log">${progress}</div>
         ${shots ? `<h2 style="padding:18px 0 0">截图</h2><div class="shots">${shots}</div>` : ''}
         ${links ? `<div class="links">${links}</div>` : ''}
+        ${renderVerifications(t)}
       </div>`
+    if (keepPath && $('#verify-path')) $('#verify-path').value = keepPath
+    wireVerification(t)
     const log = $('#log')
     if (log) log.scrollTop = log.scrollHeight
   }

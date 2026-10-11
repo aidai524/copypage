@@ -1,7 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createWriteStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
+import { Transform } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import type { CaptureQueue } from './queue.js'
+import { extractReproZip, ReproError } from './repro.js'
 import type { TaskStore } from './store.js'
 import type { CaptureJobOptions, TaskInputType } from './types.js'
 
@@ -22,6 +26,7 @@ const MIME: Record<string, string> = {
 }
 
 const MAX_BODY_BYTES = 1_000_000
+const MAX_ZIP_BYTES = 200 * 1024 * 1024
 const INPUT_TYPES: TaskInputType[] = ['url', 'image', 'video']
 
 function json(res: ServerResponse, status: number, body: unknown): void {
@@ -39,6 +44,20 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
     chunks.push(chunk as Buffer)
   }
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+}
+
+/** Stream a possibly-large request body to disk with a hard size cap. */
+async function saveBodyToFile(req: IncomingMessage, file: string, maxBytes: number): Promise<number> {
+  let total = 0
+  const counter = new Transform({
+    transform(chunk: Buffer, _enc, cb) {
+      total += chunk.length
+      if (total > maxBytes) cb(new Error(`body larger than ${Math.round(maxBytes / 1024 / 1024)}MB`))
+      else cb(null, chunk)
+    },
+  })
+  await pipeline(req, counter, createWriteStream(file))
+  return total
 }
 
 function sanitizeOptions(raw: unknown): CaptureJobOptions {
@@ -135,14 +154,28 @@ export function createApiServer({ store, queue, publicDir }: ApiDeps) {
         return
       }
       const task = await store.create({ type, source }, sanitizeOptions(input.options))
-      queue.enqueue(task.id)
+      queue.enqueue({ kind: 'capture', taskId: task.id })
       json(res, 201, { task })
+      return
+    }
+
+    // create a verification for an existing capture: JSON {repro:{type:'path'|'zip',source}}
+    // or a raw zip upload (content-type: application/zip)
+    const verify = pathname.match(/^\/api\/tasks\/([^/]+)\/verifications$/)
+    if (verify && req.method === 'POST') {
+      await createVerification(req, res, verify[1])
+      return
+    }
+
+    const files = pathname.match(/^\/api\/tasks\/([^/]+)\/files\/(.+)$/)
+    if (files && req.method === 'GET') {
+      await serveFile(res, store.taskDir(files[1]), decodeURIComponent(files[2]), files[1])
       return
     }
 
     const artifacts = pathname.match(/^\/api\/tasks\/([^/]+)\/artifacts\/(.+)$/)
     if (artifacts && req.method === 'GET') {
-      await serveArtifact(req, res, artifacts[1], decodeURIComponent(artifacts[2]))
+      await serveFile(res, store.snapshotDir(artifacts[1]), decodeURIComponent(artifacts[2]), artifacts[1])
       return
     }
 
@@ -160,25 +193,96 @@ export function createApiServer({ store, queue, publicDir }: ApiDeps) {
     json(res, 404, { error: 'not found' })
   }
 
-  async function serveArtifact(
-    _req: IncomingMessage,
+  async function createVerification(
+    req: IncomingMessage,
     res: ServerResponse,
-    id: string,
-    rel: string,
+    taskId: string,
   ): Promise<void> {
-    if (!store.get(id)) {
+    const task = store.get(taskId)
+    if (!task) {
       json(res, 404, { error: 'unknown task' })
       return
     }
-    const root = path.resolve(store.snapshotDir(id))
-    const full = path.resolve(root, rel)
-    if (full !== root && !full.startsWith(root + path.sep)) {
+    if (task.status !== 'done' || !task.result) {
+      json(res, 409, { error: 'capture must finish before verifying' })
+      return
+    }
+
+    const contentType = req.headers['content-type'] ?? ''
+    if (contentType.includes('application/zip') || contentType.includes('application/octet-stream')) {
+      const verification = await store.createVerification(taskId, { type: 'zip', source: 'upload.zip' }, '')
+      const verDir = store.verificationDir(taskId, verification.id)
+      const zipPath = path.join(verDir, 'upload.zip')
+      try {
+        await saveBodyToFile(req, zipPath, MAX_ZIP_BYTES)
+        const reproDir = await extractReproZip(zipPath, path.join(verDir, 'repro'))
+        await store.updateVerification(taskId, verification.id, {
+          reproDir,
+          repro: { type: 'zip', source: String(req.headers['x-filename'] ?? 'upload.zip').slice(0, 200) },
+        })
+      } catch (err) {
+        const message = err instanceof ReproError || err instanceof Error ? err.message : String(err)
+        await store.updateVerification(taskId, verification.id, { status: 'failed', error: message })
+        json(res, 400, { error: message })
+        return
+      }
+      queue.enqueue({ kind: 'verify', taskId, verificationId: verification.id })
+      const latest = store.get(taskId)!.verifications.find((v) => v.id === verification.id) ?? verification
+      json(res, 201, { task: store.get(taskId), verification: latest })
+      return
+    }
+
+    let body: unknown
+    try {
+      body = await readBody(req)
+    } catch {
+      json(res, 400, { error: 'invalid JSON body' })
+      return
+    }
+    const repro = ((body ?? {}) as Record<string, unknown>).repro as
+      | { type?: string; source?: string }
+      | undefined
+    const source = typeof repro?.source === 'string' ? repro.source.trim() : ''
+    if (!source) {
+      json(res, 400, { error: 'repro.source (server-local path) is required' })
+      return
+    }
+    const reproDir = path.resolve(source)
+    const info = await stat(reproDir).catch(() => null)
+    if (!info?.isDirectory()) {
+      json(res, 400, { error: `repro path is not a directory: ${source}` })
+      return
+    }
+    // NOTE: server-local paths are allowed by design in the single-tenant
+    // phase; public deployments must constrain this + add auth (Phase 4)
+    const verification = await store.createVerification(
+      taskId,
+      { type: 'path', source: reproDir },
+      reproDir,
+    )
+    queue.enqueue({ kind: 'verify', taskId, verificationId: verification.id })
+    json(res, 201, { task: store.get(taskId), verification })
+  }
+
+  async function serveFile(
+    res: ServerResponse,
+    root: string,
+    rel: string,
+    taskId: string,
+  ): Promise<void> {
+    if (!store.get(taskId)) {
+      json(res, 404, { error: 'unknown task' })
+      return
+    }
+    const resolvedRoot = path.resolve(root)
+    const full = path.resolve(resolvedRoot, rel)
+    if (full !== resolvedRoot && !full.startsWith(resolvedRoot + path.sep)) {
       json(res, 403, { error: 'forbidden' })
       return
     }
     const info = await stat(full).catch(() => null)
     if (!info || !info.isFile()) {
-      json(res, 404, { error: 'artifact not found' })
+      json(res, 404, { error: 'file not found' })
       return
     }
     res.writeHead(200, {

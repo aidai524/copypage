@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "@copypage/core": "*",
-    "@copypage/capture": "*"
+    "@copypage/capture": "*",
+    "@copypage/render": "*",
+    "@copypage/diff": "*"
   }
 }

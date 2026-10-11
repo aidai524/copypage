@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ComputedStyles, ElementNode } from '@copypage/core'
-import { comparePair, normalizeColor } from '../src/compare.js'
+import { comparePair, normalizeColor, normalizeCssUrls } from '../src/compare.js'
 
 function styles(over: Partial<ComputedStyles>): ComputedStyles {
   return {
@@ -24,6 +24,21 @@ describe('normalizeColor', () => {
     expect(normalizeColor('rgb(255, 0, 0)')).toEqual([255, 0, 0, 1])
     expect(normalizeColor('#ff0000')).toEqual([255, 0, 0, 1])
     expect(normalizeColor('rgba(99, 102, 241, 0.4)')).toEqual([99, 102, 241, 0.4])
+  })
+})
+
+describe('normalizeCssUrls', () => {
+  it('ignores scheme/host/port, keeps path and query', () => {
+    expect(normalizeCssUrls('url("http://127.0.0.1:33079/assets/bg.png")')).toBe(
+      'url("/assets/bg.png")',
+    )
+    expect(
+      normalizeCssUrls('url("http://127.0.0.1:1/assets/bg.png?v=2")'),
+    ).toBe(normalizeCssUrls('url("https://cdn.example.com/assets/bg.png?v=2")'))
+  })
+
+  it('keeps different paths different', () => {
+    expect(normalizeCssUrls('url("/a.png")')).not.toBe(normalizeCssUrls('url("/b.png")'))
   })
 })
 

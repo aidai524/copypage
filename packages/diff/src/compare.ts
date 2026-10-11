@@ -31,6 +31,21 @@ export function normalizeColor(s: string): [number, number, number, number] | nu
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255), +(rgb.alpha ?? 1).toFixed(3)]
 }
 
+/**
+ * css url() values are compared by path only: the same asset served from two
+ * different local ports (orig capture vs repro capture) is not a difference.
+ */
+export function normalizeCssUrls(value: string): string {
+  return value.replace(/url\(("|')?([^"')]+)("|')?\)/g, (match, q1, url: string) => {
+    try {
+      const u = new URL(url)
+      return `url(${q1 ?? ''}${u.pathname}${u.search}${u.hash}${q1 ?? ''})`
+    } catch {
+      return match
+    }
+  })
+}
+
 /** colors embedded anywhere in a css value string (border, box-shadow, …) */
 function extractColors(s: string): [number, number, number, number][] {
   const out: [number, number, number, number][] = []
@@ -102,6 +117,10 @@ export function comparePair(orig: ElementNode, repro: ElementNode, pageArea: num
     const e = orig.styles[key] ?? ''
     const a = repro.styles[key] ?? ''
     if (e === a) continue
+
+    // background-image URLs: ignore scheme/host/port — the same asset served
+    // from different local ports is not a difference
+    if (key === 'backgroundImage' && normalizeCssUrls(e) === normalizeCssUrls(a)) continue
 
     // color-ish
     if (['color', 'backgroundColor'].includes(key)) {

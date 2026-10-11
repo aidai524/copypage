@@ -6,6 +6,9 @@ import { alignTrees } from './align.js'
 import { comparePair, resetEntryCounter, type DiffEntry } from './compare.js'
 import { cropPng, diffRegions } from './crops.js'
 
+export * from './converge.js'
+export * from './report.js'
+
 export interface DiffMetrics {
   ssim: number
   pixelDiffPct: number
