@@ -94,7 +94,8 @@ const PROBE_SRC = `(maxNodes) => {
 /**
  * Extract the visible DOM tree with computed styles.
  * Returns the body-rooted ElementNode tree.
+ * @param maxNodes node budget; large live feeds (pump.fun ~7k nodes) need more than the 4000 default
  */
-export async function probeDom(page: Page): Promise<ElementNode> {
-  return page.evaluate(`(${PROBE_SRC})(${MAX_NODES})`) as Promise<ElementNode>
+export async function probeDom(page: Page, maxNodes: number = MAX_NODES): Promise<ElementNode> {
+  return page.evaluate(`(${PROBE_SRC})(${maxNodes})`) as Promise<ElementNode>
 }

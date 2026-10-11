@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Overlay Fixture</title>
+<style>
+  body { margin: 0; font-family: sans-serif; background: #0b0b0e; color: #fff; }
+  nav { padding: 16px; }
+  #banner-x { position: fixed; bottom: 16px; right: 16px; width: 320px; background: #1b1b20; padding: 16px; border-radius: 8px; }
+  #banner-x p { font-size: 12px; }
+  #welcome-modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); z-index: 999; }
+  .modal-card { background: #16161a; border: 1px solid #2a2a30; padding: 24px; border-radius: 12px; width: 420px; text-align: center; }
+  button { cursor: pointer; padding: 10px 18px; border-radius: 8px; border: 0; }
+  .primary { background: #4ade80; color: #052e16; width: 100%; }
+  .ghost { background: #2a2a30; color: #fff; }
+  #decoy-accept { background: #e5e7eb; color: #111; }
+</style>
+</head>
+<body>
+  <nav>
+    <a href="#next" id="nav-next">Next</a>
+    <button id="decoy-accept">Accept</button>
+    <p id="content">Page content behind overlays.</p>
+  </nav>
+
+  <div id="welcome-modal" role="dialog" aria-modal="true" aria-label="Welcome">
+    <div class="modal-card">
+      <h2>Welcome!</h2>
+      <p>Read this before continuing.</p>
+      <button class="primary" id="modal-continue">Continue</button>
+    </div>
+  </div>
+
+  <div id="banner-x">
+    <p>This site uses cookies to improve your experience. By continuing you agree to our privacy policy.</p>
+    <div>
+      <button class="ghost" id="cookie-reject">Reject all</button>
+      <button class="primary" id="cookie-accept" style="width:auto">Accept all</button>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('modal-continue').addEventListener('click', () => {
+      document.getElementById('welcome-modal').style.display = 'none'
+    })
+    document.getElementById('cookie-accept').addEventListener('click', () => {
+      document.getElementById("banner-x").style.display = 'none'
+    })
+    document.getElementById('nav-next').addEventListener('click', () => {
+      document.getElementById('nav-next').setAttribute('data-clicked', 'yes')
+    })
+    document.getElementById('decoy-accept').addEventListener('click', () => {
+      document.getElementById('decoy-accept').setAttribute('data-clicked', 'yes')
+    })
+  </script>
+</body>
+</html>

@@ -79,4 +79,6 @@ export interface Snapshot {
   brief?: string
   /** path to charts.json relative to snapshot dir */
   charts?: string
+  /** path to dismissed.json relative to snapshot dir (overlays auto-closed during capture) */
+  dismissed?: string
 }

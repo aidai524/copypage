@@ -14,6 +14,30 @@ interface CollectedAsset {
   suggestedName: string
 }
 
+const EXT_BY_CTYPE: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/svg+xml': '.svg',
+  'image/avif': '.avif',
+  'image/x-icon': '.ico',
+  'image/vnd.microsoft.icon': '.ico',
+  'font/woff': '.woff',
+  'font/woff2': '.woff2',
+  'video/mp4': '.mp4',
+}
+
+/** Append/repair the file extension based on the served content-type. */
+export function withContentTypeExt(name: string, contentType: string | undefined): string {
+  const ctype = (contentType ?? '').split(';')[0].trim().toLowerCase()
+  const wanted = EXT_BY_CTYPE[ctype]
+  if (!wanted) return name
+  const current = path.extname(name).toLowerCase()
+  if (current === wanted) return name
+  return `${name.replace(/\.[a-z0-9]+$/i, '')}${wanted}`
+}
+
 /** Collect + download page assets (img/src, favicon links, inline svg) into outDir/assets. */
 export async function downloadAssets(page: Page, outDir: string): Promise<AssetsResult> {
   const assetsDir = path.join(outDir, 'assets')
@@ -55,30 +79,56 @@ export async function downloadAssets(page: Page, outDir: string): Promise<Assets
 
   const files: string[] = []
   const failed: { url: string; reason: string }[] = []
+  const MAX_ASSET_BYTES = 10 * 1024 * 1024
 
-  for (const asset of collected) {
+  async function fetchOne(asset: CollectedAsset): Promise<void> {
     const rel = path.join('assets', asset.suggestedName)
     if (asset.kind === 'svg') {
       await writeFile(path.join(outDir, rel), asset.svgSource!, 'utf8')
       files.push(rel)
-      continue
+      return
     }
     try {
       const res = await page.request.get(asset.url!, {
         headers: { referer: page.url() },
-        timeout: 15000,
+        timeout: 12000,
       })
       if (!res.ok()) {
         failed.push({ url: asset.url!, reason: `http ${res.status()}` })
-        continue
+        return
+      }
+      const len = Number(res.headers()['content-length'] ?? '0')
+      if (len > MAX_ASSET_BYTES) {
+        failed.push({ url: asset.url!, reason: `too large (${Math.round(len / 1024 / 1024)}MB)` })
+        return
       }
       const body = await res.body()
-      await writeFile(path.join(outDir, rel), body)
-      files.push(rel)
+      if (body.length > MAX_ASSET_BYTES) {
+        failed.push({ url: asset.url!, reason: `too large (${Math.round(body.length / 1024 / 1024)}MB)` })
+        return
+      }
+      // pump.fun-style proxies serve extension-less URLs; repair from content-type
+      const finalName = withContentTypeExt(asset.suggestedName, res.headers()['content-type'])
+      const finalRel = path.join('assets', finalName)
+      await writeFile(path.join(outDir, finalRel), body)
+      files.push(finalRel)
     } catch (err) {
       failed.push({ url: asset.url!, reason: String(err).slice(0, 200) })
     }
   }
+
+  // bounded concurrency: IPFS-hosted images can take seconds each, and 200+
+  // assets serialized turn a capture into a multi-minute stall
+  const CONCURRENCY = 8
+  let cursor = 0
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, collected.length) }, async () => {
+      while (cursor < collected.length) {
+        const asset = collected[cursor++]
+        await fetchOne(asset)
+      }
+    }),
+  )
 
   return { files, failed }
 }

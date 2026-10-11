@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { chromium, type Browser } from 'playwright'
 import { serveStatic, type StaticServer } from '@copypage/core'
-import { downloadAssets } from '../src/assets.js'
+import { downloadAssets, withContentTypeExt } from '../src/assets.js'
 
 const FIXTURE = path.resolve(__dirname, '../../../fixtures/site')
 
@@ -51,5 +51,12 @@ describe('downloadAssets', () => {
   it('records failed downloads without throwing', async () => {
     expect(result.failed.length).toBeGreaterThanOrEqual(1)
     expect(result.failed[0].url).toContain('missing-404')
+  })
+
+  it('repairs missing extensions from content-type', () => {
+    expect(withContentTypeExt('13-bafkreifoo', 'image/jpeg')).toBe('13-bafkreifoo.jpg')
+    expect(withContentTypeExt('4-bg.png', 'image/jpeg')).toBe('4-bg.jpg')
+    expect(withContentTypeExt('3-icon.svg', 'image/svg+xml; charset=utf-8')).toBe('3-icon.svg')
+    expect(withContentTypeExt('9-weird', 'application/octet-stream')).toBe('9-weird')
   })
 })

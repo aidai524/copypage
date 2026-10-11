@@ -9,6 +9,7 @@ import { detectCharts } from './charts.js'
 import { discoverInteractions } from './interactions.js'
 import { freezeDynamic, registerTimerHooks } from './freeze.js'
 import { detectAdaptive } from './adaptive.js'
+import { dismissOverlays, type Dismissal } from './dismiss.js'
 
 export interface CaptureSiteOptions {
   viewports?: number[]
@@ -16,6 +17,10 @@ export interface CaptureSiteOptions {
   viewportHeight?: number
   /** run interaction-state capture (expensive: N elements × 3 states × screenshot) */
   states?: boolean
+  /** auto-dismiss cookie banners / first-visit modals before capture; default true */
+  dismiss?: boolean
+  /** DOM probe node budget; raise for large live feeds (default 4000) */
+  maxNodes?: number
 }
 
 const DEFAULT_VIEWPORTS = [1440, 768, 375]
@@ -39,6 +44,8 @@ export async function captureSite(
   const browser = await chromium.launch()
   let snapshotAssets: string | undefined
   let snapshotCharts: string | undefined
+  let snapshotDismissed: string | undefined
+  const allDismissals: Dismissal[] = []
   try {
     const screenshots: Record<string, string> = {}
     const doms: DomSnapshot[] = []
@@ -52,7 +59,13 @@ export async function captureSite(
         // heavy sites never reach networkidle — wait bounded settle instead
         await page.waitForLoadState('load', { timeout: 20000 }).catch(() => {})
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+        if (opts.dismiss !== false) {
+          allDismissals.push(...(await dismissOverlays(page)))
+        }
         await autoScroll(page)
+        if (opts.dismiss !== false) {
+          allDismissals.push(...(await dismissOverlays(page)))
+        }
         await freezeDynamic(page)
         const shotRel = `screenshots/${width}.png`
         await page.screenshot({
@@ -60,7 +73,7 @@ export async function captureSite(
           fullPage: true,
           animations: 'disabled', // jump CSS animations to their end state
         })
-        const root = await probeDom(page)
+        const root = await probeDom(page, opts.maxNodes)
         log(`viewport ${width}: done`)
         const dom: DomSnapshot = {
           url: page.url(),
@@ -82,7 +95,13 @@ export async function captureSite(
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
       log('meta pass: loaded, scrolling')
+      if (opts.dismiss !== false) {
+        allDismissals.push(...(await dismissOverlays(page)))
+      }
       await autoScroll(page) // lazy assets/charts/interactive elements render on scroll
+      if (opts.dismiss !== false) {
+        allDismissals.push(...(await dismissOverlays(page)))
+      }
       await freezeDynamic(page)
       const adaptive = await detectAdaptive(page)
       await writeFile(path.join(outDir, 'adaptive.json'), JSON.stringify(adaptive, null, 2))
@@ -130,6 +149,13 @@ export async function captureSite(
           JSON.stringify(assets.failed, null, 2),
         )
       }
+      if (allDismissals.length > 0) {
+        await writeFile(
+          path.join(outDir, 'dismissed.json'),
+          JSON.stringify(allDismissals, null, 2),
+        )
+        snapshotDismissed = 'dismissed.json'
+      }
       snapshotAssets = assets.files.length > 0 ? 'assets' : undefined
     } finally {
       await page.close()
@@ -142,6 +168,7 @@ export async function captureSite(
       dom: doms,
       ...(snapshotAssets ? { assetsDir: snapshotAssets } : {}),
       ...(snapshotCharts ? { charts: snapshotCharts } : {}),
+      ...(snapshotDismissed ? { dismissed: snapshotDismissed } : {}),
     }
     await writeSnapshot(outDir, snapshot)
   } finally {
