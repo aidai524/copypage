@@ -156,11 +156,21 @@ COPYPAGE_WORKER_CONCURRENCY=2 npx tsx packages/server/src/cli.ts --port 4402 --d
 # 前置 Caddy/nginx 负载均衡, 各实例加 --trust-proxy
 ```
 
-**跨主机部署**还需要三件事(接口已就绪,尚未实现):
+### 跨主机部署(已就绪)
 
-1. `Db` 接口已在 `db.ts` 抽出;需将其方法改为异步并提供 **Postgres 适配器**(`DATABASE_URL` 选择)。当前 SQLite 后端是同步 API,直接塞 `pg` 会出现同步/异步不匹配,必须整体 async 化
-2. 产物目录改为共享存储(NFS)或对象存储(S3)适配,否则各主机看不到彼此的截图/DOM
-3. 会话/限流为无状态(已在数据库),无需改动
+```ini
+COPYPAGE_DATABASE_URL=postgres://copypage:***@db-host:5432/copypage   # 状态层
+# dataDir 挂到共享卷(NFS),各主机挂载点路径一致
+COPYPAGE_DATA_DIR=/srv/copypage
+```
+
+- 状态(SQLite → Postgres):`PgDb` 实现同一异步契约;建表自动完成;数据目录仍需存在(产物落盘)
+- 队列:Postgres 用 `FOR UPDATE SKIP LOCKED` 原子认领,任意数量的实例共用一个队列
+- 产物:用 **NFS 共享卷**即可(各主机同路径挂载);对象存储(S3)适配未实现,如需无 NFS 部署再补
+- 会话/限流/配额都在数据库,实例无状态;前面挂负载均衡 + `--trust-proxy`
+- 验证方式:
+  - 默认测试用嵌入式 Postgres(PGlite,真 SQL)跑适配器 + 完整捕获流水线
+  - 真服务器的跨连接认领: `COPYPAGE_TEST_DATABASE_URL=postgres://… npm test`
 
 ## 自动生成
 

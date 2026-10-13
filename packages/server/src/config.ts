@@ -58,6 +58,8 @@ export interface ServerConfig {
   workerCpus: number
   /** process limit per worker container */
   workerPidsLimit: number
+  /** Postgres connection string; when set, state lives in Postgres (multi-host) */
+  databaseUrl?: string
   /** request log format */
   logFormat: 'text' | 'json'
   /** expose GET /metrics without auth (loopback is always allowed) */
@@ -175,6 +177,12 @@ export function resolveConfig(partial: Partial<ServerConfig> = {}): ServerConfig
     workerNetwork: partial.workerNetwork ?? process.env.COPYPAGE_WORKER_NETWORK ?? 'bridge',
     workerCpus: partial.workerCpus ?? Number(process.env.COPYPAGE_WORKER_CPUS ?? '1'),
     workerPidsLimit: partial.workerPidsLimit ?? Number(process.env.COPYPAGE_WORKER_PIDS_LIMIT ?? '256'),
+    ...(partial.databaseUrl ?? process.env.COPYPAGE_DATABASE_URL ?? process.env.DATABASE_URL
+      ? {
+          databaseUrl:
+            partial.databaseUrl ?? process.env.COPYPAGE_DATABASE_URL ?? process.env.DATABASE_URL,
+        }
+      : {}),
     logFormat: partial.logFormat ?? (process.env.COPYPAGE_LOG_FORMAT === 'json' ? 'json' : 'text'),
     metricsOpen: partial.metricsOpen ?? envBool('COPYPAGE_METRICS_OPEN', false),
     ...(partial.adminEmail ?? process.env.COPYPAGE_ADMIN_EMAIL

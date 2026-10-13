@@ -34,6 +34,7 @@ const sandbox = arg('sandbox', 'process') === 'docker' ? 'docker' : 'process'
 const workerImage = arg('worker-image', 'copypage-server:local')!
 const workerNetwork = arg('worker-network', 'bridge')!
 const workerCpus = Number(arg('worker-cpus', '1'))
+const databaseUrl = arg('database-url')
 
 const server = await startServer({
   port,
@@ -57,6 +58,7 @@ const server = await startServer({
   workerImage,
   workerNetwork,
   workerCpus,
+  ...(databaseUrl ? { databaseUrl } : {}),
   ...(adminEmail ? { adminEmail } : {}),
   ...(adminPassword ? { adminPassword } : {}),
   ...(token ? { token } : {}),

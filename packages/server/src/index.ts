@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { createApiServer } from './api.js'
 import { resolveConfig, type ServerConfig } from './config.js'
 import { SqliteDb, type Db } from './db.js'
+import { PgDb } from './pg-db.js'
 import { startAlertRunner } from './alerts.js'
 import { alertEmail, createEmailClient, type EmailClient } from './email.js'
 import { Metrics } from './metrics.js'
@@ -17,6 +18,8 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 export type StartServerOptions = Partial<ServerConfig> & {
   /** inject a mail transport (tests use a fake Resend-compatible endpoint) */
   emailClient?: EmailClient
+  /** inject a state store (tests run the whole service on an embedded Postgres) */
+  db?: Db
 }
 
 export interface RunningServer {
@@ -42,7 +45,8 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
     const version = await assertDockerAvailable()
     console.log(`[sandbox] docker ${version} · image ${config.workerImage} · network ${config.workerNetwork}`)
   }
-  const db = new SqliteDb(dataDir)
+  const db: Db = opts.db ?? (config.databaseUrl ? await PgDb.create(config.databaseUrl) : new SqliteDb(dataDir))
+  if (config.databaseUrl && !opts.db) console.log('[db] using postgres (multi-host mode)')
   const imported = await importLegacyTasks(dataDir, db)
   if (imported > 0) console.log(`[migrate] imported ${imported} task(s) from the pre-SQLite file store`)
   const store = new TaskStore(dataDir, db)

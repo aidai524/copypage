@@ -466,7 +466,7 @@ export class SqliteDb {
    * Atomically claim the oldest queued job this instance can run. Excluded
    * owners are those already at their per-tenant concurrency limit.
    */
-  async claimJob(instanceId: string, excludeOwners: string[] = []) {
+  async claimJob(instanceId: string, excludeOwners: string[] = []): Promise<JobRow | undefined> {
     const now = new Date().toISOString()
     this.db.exec('BEGIN IMMEDIATE')
     try {
