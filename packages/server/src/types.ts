@@ -49,6 +49,8 @@ export interface Task {
   /** convergence loop state (mirrors diff's LoopState) */
   loop: LoopState
   verifications: Verification[]
+  /** agent-driven generation runs */
+  generations: Generation[]
   error?: string
   result?: TaskResult
 }
@@ -93,4 +95,27 @@ export interface VerificationResult {
   heatmaps: string[]
   vlmRequests?: string
   durationMs: number
+}
+
+export type GenerationStatus = 'queued' | 'running' | 'done' | 'failed'
+
+export interface GenerationRound {
+  round: number
+  decision: string
+  metrics: { ssim: number; pixelDiffPct: number; dynamicAreaPct?: number }
+}
+
+/** One agent-driven generation run (each round creates a Verification record). */
+export interface Generation {
+  id: string
+  status: GenerationStatus
+  createdAt: string
+  updatedAt: string
+  reproDir: string
+  sessionId: string
+  agent: { command: string; model?: string }
+  rounds: GenerationRound[]
+  progress: TaskProgressEntry[]
+  finalDecision?: string
+  error?: string
 }

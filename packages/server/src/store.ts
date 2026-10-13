@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { CaptureJobOptions, Task, TaskInput, Verification } from './types.js'
+import type { CaptureJobOptions, Generation, Task, TaskInput, Verification } from './types.js'
 
 export function newTaskId(): string {
   const t = new Date()
@@ -11,6 +11,13 @@ export function newTaskId(): string {
 }
 
 const MAX_PROGRESS_ENTRIES = 500
+
+function pushProgress(list: { at: string; message: string }[], message: string): void {
+  list.push({ at: new Date().toISOString(), message })
+  if (list.length > MAX_PROGRESS_ENTRIES) {
+    list.splice(0, list.length - MAX_PROGRESS_ENTRIES)
+  }
+}
 
 /**
  * Task registry with disk write-through. Emits 'task' with the full Task on
@@ -38,6 +45,10 @@ export class TaskStore {
     return path.join(this.taskDir(taskId), 'verifications', verificationId)
   }
 
+  generationDir(taskId: string, generationId: string): string {
+    return path.join(this.taskDir(taskId), 'generations', generationId)
+  }
+
   /** Load persisted tasks; running jobs from a previous process are marked failed. */
   async init(): Promise<void> {
     const tasksRoot = path.join(this.dataDir, 'tasks')
@@ -57,6 +68,10 @@ export class TaskStore {
         }
         if (!Array.isArray(task.verifications)) {
           task.verifications = []
+          changed = true
+        }
+        if (!Array.isArray(task.generations)) {
+          task.generations = []
           changed = true
         }
         if (task.status === 'running' || task.status === 'queued') {
@@ -113,6 +128,7 @@ export class TaskStore {
       progress: [],
       loop: { round: 0, history: [], escalated: false },
       verifications: [],
+      generations: [],
     }
     await mkdir(this.taskDir(task.id), { recursive: true })
     this.tasks.set(task.id, task)
@@ -132,11 +148,65 @@ export class TaskStore {
   async appendProgress(id: string, message: string): Promise<void> {
     const task = this.tasks.get(id)
     if (!task) return
-    task.progress.push({ at: new Date().toISOString(), message })
-    if (task.progress.length > MAX_PROGRESS_ENTRIES) {
-      task.progress.splice(0, task.progress.length - MAX_PROGRESS_ENTRIES)
-    }
+    pushProgress(task.progress, message)
     task.updatedAt = new Date().toISOString()
+    await this.persist(task)
+    this.emit(task)
+  }
+
+  async createGeneration(
+    taskId: string,
+    opts: { reproDir: string; sessionId: string; command: string; model?: string },
+  ): Promise<Generation> {
+    const task = this.tasks.get(taskId)
+    if (!task) throw new Error(`unknown task ${taskId}`)
+    const now = new Date().toISOString()
+    const generation: Generation = {
+      id: newTaskId(),
+      status: 'queued',
+      createdAt: now,
+      updatedAt: now,
+      reproDir: opts.reproDir,
+      sessionId: opts.sessionId,
+      agent: { command: opts.command, ...(opts.model ? { model: opts.model } : {}) },
+      rounds: [],
+      progress: [],
+    }
+    await mkdir(this.generationDir(taskId, generation.id), { recursive: true })
+    task.generations.push(generation)
+    task.updatedAt = now
+    await this.persist(task)
+    this.emit(task)
+    return generation
+  }
+
+  async updateGeneration(
+    taskId: string,
+    generationId: string,
+    patch: Partial<Generation>,
+  ): Promise<Generation> {
+    const task = this.tasks.get(taskId)
+    if (!task) throw new Error(`unknown task ${taskId}`)
+    const generation = task.generations.find((g) => g.id === generationId)
+    if (!generation) throw new Error(`unknown generation ${generationId}`)
+    Object.assign(generation, patch, { updatedAt: new Date().toISOString() })
+    task.updatedAt = generation.updatedAt
+    await this.persist(task)
+    this.emit(task)
+    return generation
+  }
+
+  async appendGenerationProgress(
+    taskId: string,
+    generationId: string,
+    message: string,
+  ): Promise<void> {
+    const task = this.tasks.get(taskId)
+    const generation = task?.generations.find((g) => g.id === generationId)
+    if (!task || !generation) return
+    pushProgress(generation.progress, message)
+    generation.updatedAt = new Date().toISOString()
+    task.updatedAt = generation.updatedAt
     await this.persist(task)
     this.emit(task)
   }
@@ -191,10 +261,7 @@ export class TaskStore {
     const task = this.tasks.get(taskId)
     const verification = task?.verifications.find((v) => v.id === verificationId)
     if (!task || !verification) return
-    verification.progress.push({ at: new Date().toISOString(), message })
-    if (verification.progress.length > MAX_PROGRESS_ENTRIES) {
-      verification.progress.splice(0, verification.progress.length - MAX_PROGRESS_ENTRIES)
-    }
+    pushProgress(verification.progress, message)
     verification.updatedAt = new Date().toISOString()
     task.updatedAt = verification.updatedAt
     await this.persist(task)

@@ -225,6 +225,61 @@
   function artifactUrl(task, rel) { return `/api/tasks/${task.id}/artifacts/${rel}` }
   function fileUrl(task, rel) { return `/api/tasks/${task.id}/files/${rel}` }
 
+  function renderGenerations(t) {
+    if (t.status !== 'done') return ''
+    const runs = [...(t.generations || [])].reverse()
+    const runsHtml = runs
+      .map((g) => {
+        const rounds = g.rounds && g.rounds.length
+          ? `<div class="vmetrics">${g.rounds
+              .map(
+                (r) =>
+                  `<div class="m">第 ${r.round} 轮 ${esc(DECISION[r.decision] || r.decision)}<b>${r.metrics.ssim} / ${r.metrics.pixelDiffPct}%</b></div>`,
+              )
+              .join('')}</div>`
+          : ''
+        const log = g.progress && g.progress.length
+          ? `<div class="vlog">${g.progress.slice(-40).map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')}</div>`
+          : ''
+        return `<div class="vrun">
+          <div class="vhead">
+            <b>生成运行 ${esc(g.id)}</b>
+            <span class="chip ${g.status}">${VSTATUS[g.status]}</span>
+            ${g.finalDecision ? `<span class="chip ${g.finalDecision}">${DECISION[g.finalDecision] || g.finalDecision}</span>` : ''}
+            <span class="time">${esc(g.agent.command)}${g.agent.model ? ' (' + esc(g.agent.model) + ')' : ''} · ${fmtTime(g.createdAt)}</span>
+          </div>
+          ${g.error ? `<div class="error">${esc(g.error)}</div>` : ''}
+          ${rounds}${log}
+        </div>`
+      })
+      .join('')
+    return `
+      <h2 style="padding:18px 0 0">自动生成还原工程</h2>
+      <div class="vform">
+        <button id="generate-btn">启动自动生成</button>
+        <div class="note">服务端以 --allow-agent 启动后可用：agent（pi）按 copypage skill 读取快照生成工程，每轮由服务端验证并回传差异清单，直到收敛。每轮产生一条验证记录（见下方）。</div>
+      </div>
+      ${runsHtml || '<p class="hint" style="padding:0">还没有生成记录</p>'}`
+  }
+
+  function wireGeneration(t) {
+    const btn = $('#generate-btn')
+    if (!btn) return
+    btn.onclick = async () => {
+      btn.disabled = true
+      try {
+        const res = await apiFetch(`/api/tasks/${t.id}/generate`, { method: 'POST' })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || res.statusText)
+        upsert(data.task); renderTasks(); renderDetail()
+      } catch (err) {
+        alert('启动生成失败：' + err.message)
+      } finally {
+        btn.disabled = false
+      }
+    }
+  }
+
   function renderVerifications(t) {
     if (t.status !== 'done') return ''
     const runs = [...(t.verifications || [])].reverse()
@@ -377,9 +432,11 @@
         <div class="log" id="log">${progress}</div>
         ${shots ? `<h2 style="padding:18px 0 0">截图</h2><div class="shots">${shots}</div>` : ''}
         ${links ? `<div class="links">${links}</div>` : ''}
+        ${t.status === 'done' ? renderGenerations(t) : ''}
         ${renderVerifications(t)}
       </div>`
     if (keepPath && $('#verify-path')) $('#verify-path').value = keepPath
+    wireGeneration(t)
     wireVerification(t)
     const log = $('#log')
     if (log) log.scrollTop = log.scrollHeight

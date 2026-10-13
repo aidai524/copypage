@@ -1,15 +1,17 @@
-import { readFile, readdir, stat } from 'node:fs/promises'
+import { mkdir, readFile, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { readSnapshot } from '@copypage/core'
 import { captureImage, captureSite, captureVideo } from '@copypage/capture'
 import { BuildError, captureRepro } from '@copypage/render'
 import { decide, diffSnapshots, writeReport } from '@copypage/diff'
+import { runGenerationLoop } from '@copypage/generator'
 import type { TaskStore } from './store.js'
-import type { TaskResult, VerificationResult } from './types.js'
+import type { TaskResult, Verification, VerificationResult } from './types.js'
 
 export type QueueJob =
   | { kind: 'capture'; taskId: string }
   | { kind: 'verify'; taskId: string; verificationId: string }
+  | { kind: 'generate'; taskId: string; generationId: string }
 
 async function readJson<T>(file: string): Promise<T | undefined> {
   try {
@@ -56,23 +58,39 @@ export async function summarizeSnapshot(dir: string, durationMs: number): Promis
   }
 }
 
-/**
- * Serial job queue: browser captures and repro verifications are memory/time
- * heavy, so jobs run one at a time in FIFO order. Progress streams back
- * through the store (and therefore SSE).
- */
 export interface CaptureQueueOptions {
   /** run `npm run build` inside repro dirs; disabled by default in the server */
   allowBuild?: boolean
+  /** repo root that holds `skill/` — the agent's working directory */
+  repoRoot?: string
+  agent?: {
+    command?: string
+    args?: string[]
+    model?: string
+    maxRounds?: number
+    timeoutMs?: number
+  }
 }
 
+/**
+ * Serial job queue: browser captures, repro verifications and agent generation
+ * runs are memory/time heavy, so jobs run one at a time in FIFO order.
+ * Progress streams back through the store (and therefore SSE).
+ */
 export class CaptureQueue {
   private pending: QueueJob[] = []
   private running = false
   private allowBuild: boolean
+  private repoRoot: string
+  private agent: NonNullable<CaptureQueueOptions['agent']>
 
-  constructor(private store: TaskStore, opts: CaptureQueueOptions = {}) {
+  constructor(
+    private store: TaskStore,
+    opts: CaptureQueueOptions = {},
+  ) {
     this.allowBuild = opts.allowBuild ?? true
+    this.repoRoot = opts.repoRoot ?? process.cwd()
+    this.agent = opts.agent ?? {}
   }
 
   /** queued + running jobs */
@@ -92,15 +110,22 @@ export class CaptureQueue {
     this.running = true
     try {
       if (job.kind === 'capture') await this.runCapture(job.taskId)
-      else await this.runVerification(job.taskId, job.verificationId)
+      else if (job.kind === 'verify') await this.runVerification(job.taskId, job.verificationId)
+      else await this.runGeneration(job.taskId, job.generationId)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       if (job.kind === 'capture') {
         await this.store.appendProgress(job.taskId, `failed: ${message}`)
         await this.store.update(job.taskId, { status: 'failed', error: message })
-      } else {
+      } else if (job.kind === 'verify') {
         await this.store.appendVerificationProgress(job.taskId, job.verificationId, `failed: ${message}`)
         await this.store.updateVerification(job.taskId, job.verificationId, {
+          status: 'failed',
+          error: message,
+        })
+      } else {
+        await this.store.appendGenerationProgress(job.taskId, job.generationId, `failed: ${message}`)
+        await this.store.updateGeneration(job.taskId, job.generationId, {
           status: 'failed',
           error: message,
         })
@@ -137,44 +162,31 @@ export class CaptureQueue {
   }
 
   /**
-   * Verify a repro against the original capture with the exact same pipeline
-   * used locally: captureRepro → diffSnapshots (dynamic masking included) →
-   * writeReport → converge decision.
+   * Capture the repro, diff it against the original with dynamic masking,
+   * write the report and run the convergence decision. Throws on build or
+   * capture failure (callers decide how to record it).
    */
-  private async runVerification(taskId: string, verificationId: string): Promise<void> {
+  private async executeVerification(taskId: string, verificationId: string): Promise<VerificationResult> {
     const task = this.store.get(taskId)
-    if (!task) return
+    if (!task) throw new Error(`unknown task ${taskId}`)
     const verification = task.verifications.find((v) => v.id === verificationId)
-    if (!verification) return
+    if (!verification) throw new Error(`unknown verification ${verificationId}`)
 
     const started = Date.now()
     const verDir = this.store.verificationDir(taskId, verificationId)
     const onProgress = (message: string) => {
       void this.store.appendVerificationProgress(taskId, verificationId, message)
     }
-    await this.store.updateVerification(taskId, verificationId, { status: 'running' })
 
     const viewports = task.result?.viewports ?? [1440]
     const reproSnapDir = path.join(verDir, 'repro-snap')
 
-    try {
-      await captureRepro(verification.reproDir, reproSnapDir, {
-        viewports,
-        maxNodes: task.options.maxNodes ?? 12_000,
-        allowBuild: this.allowBuild,
-        onProgress,
-      })
-    } catch (err) {
-      if (err instanceof BuildError) {
-        await this.store.appendVerificationProgress(taskId, verificationId, 'repro build failed')
-        await this.store.updateVerification(taskId, verificationId, {
-          status: 'failed',
-          error: `${err.message}${err.output ? `\n${err.output.slice(-4000)}` : ''}`,
-        })
-        return
-      }
-      throw err
-    }
+    await captureRepro(verification.reproDir, reproSnapDir, {
+      viewports,
+      maxNodes: task.options.maxNodes ?? 12_000,
+      allowBuild: this.allowBuild,
+      onProgress,
+    })
 
     const round = verification.round
     const diffsDir = path.join(verDir, 'diffs', `r${round}`)
@@ -201,7 +213,15 @@ export class CaptureQueue {
     const vlmPath = path.join(diffsDir, 'vlm-requests.json')
     const hasVlm = await stat(vlmPath).then(() => true).catch(() => false)
 
-    const result: VerificationResult = {
+    onProgress(
+      `done: ssim ${diff.metrics.ssim} · pixelDiff ${diff.metrics.pixelDiffPct}%` +
+        (diff.metrics.dynamicAreaPct !== undefined
+          ? ` · dynamic ${diff.metrics.dynamicAreaPct}%`
+          : '') +
+        ` · ${decision}`,
+    )
+
+    return {
       metrics: diff.metrics,
       decision,
       entries: diff.entries.length,
@@ -217,13 +237,97 @@ export class CaptureQueue {
       ...(hasVlm ? { vlmRequests: `diffs/r${round}/vlm-requests.json` } : {}),
       durationMs: Date.now() - started,
     }
-    onProgress(
-      `done: ssim ${result.metrics.ssim} · pixelDiff ${result.metrics.pixelDiffPct}%` +
-        (result.metrics.dynamicAreaPct !== undefined
-          ? ` · dynamic ${result.metrics.dynamicAreaPct}%`
-          : '') +
-        ` · ${decision}`,
-    )
-    await this.store.updateVerification(taskId, verificationId, { status: 'done', result })
+  }
+
+  private async runVerification(taskId: string, verificationId: string): Promise<void> {
+    await this.store.updateVerification(taskId, verificationId, { status: 'running' })
+    try {
+      const result = await this.executeVerification(taskId, verificationId)
+      await this.store.updateVerification(taskId, verificationId, { status: 'done', result })
+    } catch (err) {
+      if (err instanceof BuildError) {
+        await this.store.appendVerificationProgress(taskId, verificationId, 'repro build failed')
+        await this.store.updateVerification(taskId, verificationId, {
+          status: 'failed',
+          error: `${err.message}${err.output ? `\n${err.output.slice(-4000)}` : ''}`,
+        })
+        return
+      }
+      throw err
+    }
+  }
+
+  /**
+   * Agent-driven generation: the agent writes the repro, each round is verified
+   * with the exact same pipeline as a manual verification, and the top diff
+   * entries feed the next agent turn.
+   */
+  private async runGeneration(taskId: string, generationId: string): Promise<void> {
+    const task = this.store.get(taskId)
+    if (!task) return
+    const generation = task.generations.find((g) => g.id === generationId)
+    if (!generation) return
+
+    await this.store.updateGeneration(taskId, generationId, { status: 'running' })
+    await mkdir(generation.reproDir, { recursive: true })
+    const onProgress = (message: string) => {
+      void this.store.appendGenerationProgress(taskId, generationId, message)
+    }
+
+    const result = await runGenerationLoop({
+      repoRoot: this.repoRoot,
+      origDir: this.store.snapshotDir(taskId),
+      reproDir: generation.reproDir,
+      viewports: task.result?.viewports ?? [1440],
+      sessionId: generation.sessionId,
+      ...(this.agent.command ? { command: this.agent.command } : {}),
+      ...(this.agent.args ? { commandArgs: this.agent.args } : {}),
+      ...(this.agent.model ? { model: this.agent.model } : {}),
+      ...(this.agent.maxRounds ? { maxRounds: this.agent.maxRounds } : {}),
+      ...(this.agent.timeoutMs ? { timeoutMs: this.agent.timeoutMs } : {}),
+      skillPath: path.join(this.repoRoot, 'skill'),
+      onProgress,
+      verify: async (round) => {
+        const verification: Verification = await this.store.createVerification(
+          taskId,
+          { type: 'path', source: generation.reproDir },
+          generation.reproDir,
+        )
+        await this.store.updateVerification(taskId, verification.id, { status: 'running' })
+        try {
+          const verified = await this.executeVerification(taskId, verification.id)
+          await this.store.updateVerification(taskId, verification.id, {
+            status: 'done',
+            result: verified,
+          })
+          return {
+            metrics: verified.metrics,
+            decision: verified.decision,
+            topEntries: verified.topEntries,
+          }
+        } catch (err) {
+          const message =
+            err instanceof BuildError
+              ? `${err.message}${err.output ? `\n${err.output.slice(-2000)}` : ''}`
+              : String(err)
+          await this.store.updateVerification(taskId, verification.id, {
+            status: 'failed',
+            error: message,
+          })
+          throw new Error(`round ${round} verification failed: ${message}`)
+        }
+      },
+    })
+
+    await this.store.updateGeneration(taskId, generationId, {
+      status: 'done',
+      finalDecision: result.finalDecision,
+      rounds: result.rounds.map((r) => ({
+        round: r.round,
+        decision: r.decision,
+        metrics: r.metrics,
+      })),
+    })
+    onProgress(`generation finished: ${result.finalDecision}`)
   }
 }

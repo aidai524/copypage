@@ -10,6 +10,7 @@
     "@copypage/core": "*",
     "@copypage/capture": "*",
     "@copypage/render": "*",
-    "@copypage/diff": "*"
+    "@copypage/diff": "*",
+    "@copypage/generator": "*"
   }
 }

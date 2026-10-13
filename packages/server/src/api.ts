@@ -198,6 +198,33 @@ export function createApiServer({ store, queue, publicDir, config }: ApiDeps) {
       return
     }
 
+    // start an agent-driven generation run
+    const generate = pathname.match(/^\/api\/tasks\/([^/]+)\/generate$/)
+    if (generate && req.method === 'POST') {
+      const task = store.get(generate[1])
+      if (!task) {
+        json(res, 404, { error: 'unknown task' })
+        return
+      }
+      if (task.status !== 'done' || !task.result) {
+        json(res, 409, { error: 'capture must finish before generating' })
+        return
+      }
+      if (!config.allowAgent) {
+        json(res, 403, { error: 'agent generation is disabled — start the server with --allow-agent' })
+        return
+      }
+      const generation = await store.createGeneration(task.id, {
+        reproDir: path.join(store.taskDir(task.id), 'generated-repro'),
+        sessionId: `gen-${task.id}-${Date.now().toString(36)}`,
+        command: config.agentCommand,
+        ...(config.agentModel ? { model: config.agentModel } : {}),
+      })
+      queue.enqueue({ kind: 'generate', taskId: task.id, generationId: generation.id })
+      json(res, 201, { task: store.get(task.id), generation })
+      return
+    }
+
     const files = pathname.match(/^\/api\/tasks\/([^/]+)\/files\/(.+)$/)
     if (files && req.method === 'GET') {
       await serveFile(res, store.taskDir(files[1]), decodeURIComponent(files[2]), files[1])

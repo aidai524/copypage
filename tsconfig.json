@@ -15,7 +15,8 @@
       "@copypage/capture": ["packages/capture/src/index.ts"],
       "@copypage/render": ["packages/render/src/index.ts"],
       "@copypage/diff": ["packages/diff/src/index.ts"],
-      "@copypage/server": ["packages/server/src/index.ts"]
+      "@copypage/server": ["packages/server/src/index.ts"],
+      "@copypage/generator": ["packages/generator/src/index.ts"]
     }
   },
   "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "eval/**/*.ts"]

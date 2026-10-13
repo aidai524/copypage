@@ -11,6 +11,7 @@ import type { Task, Verification } from '../src/types.js'
 const exec = promisify(execFile)
 const FIXTURE = path.resolve(__dirname, '../../../fixtures/site')
 const MUTATED_FIXTURE = path.resolve(__dirname, '../../../fixtures/site-mutated')
+const STUB_AGENT = path.resolve(__dirname, '../../../fixtures/agent-stub/stub-agent.mjs')
 
 async function pollTask(base: string, id: string, timeoutMs = 90_000): Promise<Task> {
   const deadline = Date.now() + timeoutMs
@@ -202,4 +203,89 @@ describe('capture service', () => {
     const health = await (await fetch(`${server.url}/api/health`)).json()
     expect(health.ok).toBe(true)
   })
+
+  it('refuses agent generation when the server has not opted in', async () => {
+    const task = server.store.list().find((t) => t.status === 'done')!
+    const res = await fetch(`${server.url}/api/tasks/${task.id}/generate`, { method: 'POST' })
+    expect(res.status).toBe(403)
+  })
+})
+
+describe('agent generation', () => {
+  let fixture: StaticServer
+  let server: RunningServer
+  let dataDir: string
+
+  beforeAll(async () => {
+    fixture = await serveStatic(FIXTURE)
+    dataDir = await mkdtemp(path.join(tmpdir(), 'cp-gen-server-'))
+    server = await startServer({
+      port: 0,
+      dataDir,
+      allowPrivateNetwork: true,
+      allowAgent: true,
+      agentCommand: 'node',
+      agentArgs: [STUB_AGENT],
+      agentMaxRounds: 4,
+    })
+  }, 60_000)
+
+  afterAll(async () => {
+    await server.close()
+    await fixture.close()
+    await rm(dataDir, { recursive: true, force: true })
+  })
+
+  it('runs agent rounds, verifies each round and converges to pass', async () => {
+    const created = await (await fetch(`${server.url}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'url',
+        source: fixture.url,
+        options: { viewports: [800], dynamic: false, states: false },
+      }),
+    })).json()
+    await pollTask(server.url, created.task.id)
+
+    const res = await fetch(`${server.url}/api/tasks/${created.task.id}/generate`, { method: 'POST' })
+    expect(res.status).toBe(201)
+    const { generation } = (await res.json()) as { generation: { id: string } }
+
+    const deadline = Date.now() + 120_000
+    let done: Task | undefined
+    while (Date.now() < deadline) {
+      const { task } = (await (await fetch(`${server.url}/api/tasks/${created.task.id}`)).json()) as { task: Task }
+      const g = task.generations.find((x) => x.id === generation.id)
+      if (g && (g.status === 'done' || g.status === 'failed')) {
+        done = task
+        break
+      }
+      await new Promise((r) => setTimeout(r, 300))
+    }
+    expect(done, 'generation did not finish').toBeDefined()
+
+    const gen = done!.generations.find((x) => x.id === generation.id)!
+    expect(gen.status).toBe('done')
+    expect(gen.finalDecision).toBe('pass')
+    expect(gen.rounds.length).toBe(2)
+    expect(gen.rounds[0].metrics.pixelDiffPct).toBeGreaterThan(2)
+    expect(gen.rounds[1].metrics.ssim).toBeGreaterThan(0.99)
+    expect(gen.progress.some((p) => p.message.includes('[agent]'))).toBe(true)
+    expect(gen.progress.some((p) => p.message.includes('round 2/4'))).toBe(true)
+
+    // every round left a verification record; the first continued, the second passed
+    const rounds = done!.verifications.sort((a, b) => a.round - b.round)
+    expect(rounds).toHaveLength(2)
+    expect(rounds[0].result?.decision).toBe('continue')
+    expect(rounds[1].result?.decision).toBe('pass')
+    expect(done!.loop.history).toHaveLength(2)
+
+    // the generated project is the round-2 fixture and is served under files/
+    const index = await fetch(
+      `${server.url}/api/tasks/${created.task.id}/files/generated-repro/index.html`,
+    )
+    expect(index.status).toBe(200)
+    expect(await index.text()).toContain('Clone me if you can')
+  }, 180_000)
 })

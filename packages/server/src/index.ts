@@ -26,7 +26,17 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
 
   const store = new TaskStore(dataDir)
   await store.init()
-  const queue = new CaptureQueue(store, { allowBuild: config.allowBuild })
+  const queue = new CaptureQueue(store, {
+    allowBuild: config.allowBuild,
+    repoRoot: path.resolve(here, '../../..'),
+    agent: {
+      command: config.agentCommand,
+      args: config.agentArgs,
+      maxRounds: config.agentMaxRounds,
+      timeoutMs: config.agentTimeoutMs,
+      ...(config.agentModel ? { model: config.agentModel } : {}),
+    },
+  })
   const server = createApiServer({ store, queue, publicDir, config })
 
   await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve))

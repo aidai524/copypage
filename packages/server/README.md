@@ -16,12 +16,17 @@ npx tsx packages/server/src/cli.ts --port 4400 --data-dir work/server
 | `--host` / `--port` | 127.0.0.1 / 4400 | 非 loopback 绑定必须配 token |
 | `--token` | 无 | 所有 `/api/*` 需要 `Authorization: Bearer <token>`(SSE 用 `?token=`) |
 | `--allow-build` | **关** | 允许对提交的工程执行 `npm run build`(= 任意代码执行,仅本地信任环境开启) |
+| `--allow-agent` | **关** | 允许 agent 自动生成(agent 拥有 shell 访问权,等价于代你执行命令) |
+| `--agent-command` | pi | agent 可执行文件 |
+| `--agent-model` | pi 默认 | 传给 agent 的模型,如 `sonnet:high` |
+| `--agent-max-rounds` | 8 | 生成–验证循环轮数上限 |
+| `--agent-timeout-min` | 30 | 单轮 agent 墙钟超时 |
 | `--allow-private-network` | **关** | 关闭 SSRF 防护(本地 fixture 测试用) |
 | `--max-tasks` | 50 | 任务数上限,超出返回 507 |
 | `--max-upload-mb` | 200 | zip 上传大小上限 |
 | `--retention-hours` | 168 | 完成任务的保留时长,过期自动删除 |
 
-环境变量同名:`COPYPAGE_TOKEN`、`COPYPAGE_ALLOW_BUILD`、`COPYPAGE_ALLOW_PRIVATE_NETWORK`、`COPYPAGE_MAX_TASKS`、`COPYPAGE_MAX_UPLOAD_MB`、`COPYPAGE_RETENTION_HOURS`。
+环境变量同名:`COPYPAGE_TOKEN`、`COPYPAGE_ALLOW_BUILD`、`COPYPAGE_ALLOW_PRIVATE_NETWORK`、`COPYPAGE_ALLOW_AGENT`、`COPYPAGE_AGENT_COMMAND`、`COPYPAGE_AGENT_MODEL`、`COPYPAGE_AGENT_MAX_ROUNDS`、`COPYPAGE_AGENT_TIMEOUT_MIN`、`COPYPAGE_MAX_TASKS`、`COPYPAGE_MAX_UPLOAD_MB`、`COPYPAGE_RETENTION_HOURS`。
 
 ### 安全默认值
 
@@ -43,6 +48,7 @@ UI 为单页应用(`public/index.html`,零依赖):右上角可填访问令牌(�
 | `GET` | `/api/tasks` | 任务列表 + 队列长度 |
 | `GET` | `/api/tasks/:id` | 单个任务(含 capture 结果、收敛状态、全部验证记录) |
 | `POST` | `/api/tasks/:id/verifications` | 创建验证任务,见下 |
+| `POST` | `/api/tasks/:id/generate` | 启动 agent 自动生成(需 `--allow-agent`) |
 | `GET` | `/api/events` | SSE:任务任意变更时推送完整任务 JSON |
 | `GET` | `/api/tasks/:id/artifacts/<rel>` | 原始快照文件(orig/ 下的截图、DOM、dynamic.json…) |
 | `GET` | `/api/tasks/:id/files/<rel>` | 任务目录下任意文件(报告、热力图、repro-snap…) |
@@ -79,6 +85,31 @@ decide(loop, metrics)           # pass / continue / escalate / stagnant-stop / c
 - 捕获阶段的任务选项（viewports / maxNodes / states / dynamic / assetsBudgetMs）会原样传给验证
 - `loop` 随每次验证推进：`history` 追加指标，`escalate` 一旦触发保持
 - 构建失败（`BuildError`）会记录完整构建输出，验证状态置为 failed
+
+## 自动生成(Phase 3)
+
+```bash
+curl -X POST localhost:4400/api/tasks/<taskId>/generate
+```
+
+服务端驱动、agent 执行的闭环(与本地手工迭代完全同构):
+
+```
+runGenerationLoop:
+  轮 1  agent(pi --mode json --skill skill/ --session-id <id>)
+        └─ 读取 orig 快照(DOM/截图/adaptive/interactions/states/assets)
+        └─ 在 <taskDir>/generated-repro 写 React 工程
+  服务端 verify:  captureRepro → diffSnapshots(动态遮罩)→ report → decide
+  └─ pass/stagnant/cap → 结束;否则把 severity 前 10 条差异写进下一轮 prompt
+  轮 N  agent 继续同一 session(保留上下文)修差异
+```
+
+- 每轮生成一条 `Verification` 记录(report.html / 热力图 / 差异清单都在 UI 可见)
+- `task.loop` 与手工验证共用同一收敛状态
+- agent 进程 stdout 为 JSONL 事件流:文本增量与工具调用实时进任务进度(SSE)
+- 取消/中断:杀掉任务即终止 agent 子进程(超时自动 SIGTERM→SIGKILL)
+
+> ⚠ agent 拥有 shell 访问权(要跑构建、截图、改文件),`--allow-agent` 只应在信任环境开启。
 
 ## 质量基线
 
