@@ -1,0 +1,10 @@
+node_modules
+work
+.git
+.env
+*.log
+deploy/pi-config
+**/dist
+docs
+eval
+fixtures

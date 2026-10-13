@@ -21,6 +21,10 @@ export interface ServerConfig {
   agentMaxRounds: number
   /** wall-clock limit per agent turn */
   agentTimeoutMs: number
+  /** per-IP requests per minute on /api/* (0 disables) */
+  rateLimitPerMinute: number
+  /** trust X-Forwarded-For (only when every request goes through a proxy) */
+  trustProxy: boolean
   /** hard cap on stored tasks; new captures are rejected above it */
   maxTasks: number
   /** max upload size for repro zips */
@@ -65,6 +69,8 @@ export function resolveConfig(partial: Partial<ServerConfig> = {}): ServerConfig
     ...(agentModel ? { agentModel } : {}),
     agentMaxRounds: partial.agentMaxRounds ?? Number(process.env.COPYPAGE_AGENT_MAX_ROUNDS ?? '8'),
     agentTimeoutMs: partial.agentTimeoutMs ?? Number(process.env.COPYPAGE_AGENT_TIMEOUT_MIN ?? '30') * 60_000,
+    rateLimitPerMinute: partial.rateLimitPerMinute ?? Number(process.env.COPYPAGE_RATE_LIMIT_PER_MINUTE ?? '120'),
+    trustProxy: partial.trustProxy ?? envBool('COPYPAGE_TRUST_PROXY', false),
     maxTasks: partial.maxTasks ?? Number(process.env.COPYPAGE_MAX_TASKS ?? '50'),
     maxUploadBytes: partial.maxUploadBytes ?? Number(process.env.COPYPAGE_MAX_UPLOAD_MB ?? '200') * 1024 * 1024,
     retentionMs: partial.retentionMs ?? Number(process.env.COPYPAGE_RETENTION_HOURS ?? '168') * 3600_000,

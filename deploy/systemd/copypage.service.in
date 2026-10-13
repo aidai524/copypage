@@ -1,0 +1,19 @@
+[Unit]
+Description=CopyPage capture/verify/generate service
+Documentation=file://__REPO__/packages/server/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO__
+# policy + token live here (KEY=value, same file docker compose uses)
+EnvironmentFile=__REPO__/deploy/.env
+ExecStart=__REPO__/node_modules/.bin/tsx packages/server/src/cli.ts --host 127.0.0.1 --port 4400 --data-dir __REPO__/work/server
+Restart=on-failure
+RestartSec=5
+# generation runs the pi agent with shell access: give it a generous timeout
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

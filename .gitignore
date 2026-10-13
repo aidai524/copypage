@@ -3,3 +3,4 @@ work/
 dist/
 .env
 .superpowers/
+deploy/pi-config/

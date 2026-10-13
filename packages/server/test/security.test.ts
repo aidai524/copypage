@@ -188,4 +188,20 @@ describe('service security', () => {
     )
     expect(res.status).toBe(403)
   })
+
+  it('rate limits api requests per client ip', async () => {
+    const limitedDir = await mkdtemp(path.join(tmpdir(), 'cp-ratelimit-'))
+    const limited = await startServer({ port: 0, dataDir: limitedDir, rateLimitPerMinute: 2 })
+    try {
+      // every /api request consumes the bucket (also protects token guessing)
+      expect((await fetch(`${limited.url}/api/health`)).status).toBe(200)
+      expect((await fetch(`${limited.url}/api/health`)).status).toBe(200)
+      const third = await fetch(`${limited.url}/api/health`)
+      expect(third.status).toBe(429)
+      expect(third.headers.get('retry-after')).toBe('60')
+    } finally {
+      await limited.close()
+      await rm(limitedDir, { recursive: true, force: true })
+    }
+  })
 })

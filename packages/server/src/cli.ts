@@ -23,6 +23,8 @@ const agentModel = arg('agent-model')
 const agentCommand = arg('agent-command', 'pi')!
 const agentMaxRounds = Number(arg('agent-max-rounds', '8'))
 const agentTimeoutMin = Number(arg('agent-timeout-min', '30'))
+const rateLimitPerMinute = Number(arg('rate-limit-per-minute', '120'))
+const trustProxy = flag('trust-proxy')
 
 const server = await startServer({
   port,
@@ -37,6 +39,8 @@ const server = await startServer({
   agentCommand,
   agentMaxRounds,
   agentTimeoutMs: agentTimeoutMin * 60_000,
+  rateLimitPerMinute,
+  trustProxy,
   ...(token ? { token } : {}),
   ...(agentModel ? { agentModel } : {}),
 })

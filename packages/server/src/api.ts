@@ -93,7 +93,40 @@ export interface ApiDeps {
 }
 
 export function createApiServer({ store, queue, publicDir, config }: ApiDeps) {
+  const buckets = new Map<string, { tokens: number; resetAt: number }>()
+
+  function clientIp(req: IncomingMessage): string {
+    if (config.trustProxy) {
+      const xff = req.headers['x-forwarded-for']
+      const first = (Array.isArray(xff) ? xff[0] : xff)?.split(',')[0]?.trim()
+      if (first) return first
+    }
+    return req.socket.remoteAddress ?? 'unknown'
+  }
+
+  /** per-IP token bucket guarding all /api routes (also protects token guessing) */
+  function allowRequest(ip: string): boolean {
+    const limit = config.rateLimitPerMinute
+    if (!limit || limit <= 0) return true
+    const now = Date.now()
+    if (buckets.size > 5000) {
+      for (const [key, bucket] of buckets) if (now > bucket.resetAt) buckets.delete(key)
+    }
+    let bucket = buckets.get(ip)
+    if (!bucket || now > bucket.resetAt) {
+      bucket = { tokens: limit, resetAt: now + 60_000 }
+      buckets.set(ip, bucket)
+    }
+    if (bucket.tokens <= 0) return false
+    bucket.tokens--
+    return true
+  }
+
   const server = createServer((req, res) => {
+    const started = Date.now()
+    res.on('finish', () => {
+      console.log(`[http] ${req.method} ${req.url} → ${res.statusCode} (${Date.now() - started}ms)`)
+    })
     void handle(req, res).catch((err) => {
       json(res, 500, { error: err instanceof Error ? err.message : String(err) })
     })
@@ -112,6 +145,12 @@ export function createApiServer({ store, queue, publicDir, config }: ApiDeps) {
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const pathname = url.pathname
+
+    if (pathname.startsWith('/api/') && !allowRequest(clientIp(req))) {
+      res.writeHead(429, { 'content-type': 'application/json; charset=utf-8', 'retry-after': '60' })
+      res.end(JSON.stringify({ error: 'rate limit exceeded' }))
+      return
+    }
 
     if (pathname.startsWith('/api/') && !authorized(req, url)) {
       json(res, 401, { error: 'unauthorized — send Authorization: Bearer <token>' })

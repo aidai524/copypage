@@ -25,8 +25,12 @@ npx tsx packages/server/src/cli.ts --port 4400 --data-dir work/server
 | `--max-tasks` | 50 | 任务数上限,超出返回 507 |
 | `--max-upload-mb` | 200 | zip 上传大小上限 |
 | `--retention-hours` | 168 | 完成任务的保留时长,过期自动删除 |
+| `--rate-limit-per-minute` | 120 | 每 IP 每分钟 /api 请求上限(0 关闭) |
+| `--trust-proxy` | 关 | 信任 `X-Forwarded-For`(仅当所有请求都经反代) |
 
-环境变量同名:`COPYPAGE_TOKEN`、`COPYPAGE_ALLOW_BUILD`、`COPYPAGE_ALLOW_PRIVATE_NETWORK`、`COPYPAGE_ALLOW_AGENT`、`COPYPAGE_AGENT_COMMAND`、`COPYPAGE_AGENT_MODEL`、`COPYPAGE_AGENT_MAX_ROUNDS`、`COPYPAGE_AGENT_TIMEOUT_MIN`、`COPYPAGE_MAX_TASKS`、`COPYPAGE_MAX_UPLOAD_MB`、`COPYPAGE_RETENTION_HOURS`。
+环境变量同名:`COPYPAGE_TOKEN`、`COPYPAGE_ALLOW_BUILD`、`COPYPAGE_ALLOW_PRIVATE_NETWORK`、`COPYPAGE_ALLOW_AGENT`、`COPYPAGE_AGENT_COMMAND`、`COPYPAGE_AGENT_MODEL`、`COPYPAGE_AGENT_MAX_ROUNDS`、`COPYPAGE_AGENT_TIMEOUT_MIN`、`COPYPAGE_MAX_TASKS`、`COPYPAGE_MAX_UPLOAD_MB`、`COPYPAGE_RETENTION_HOURS`、`COPYPAGE_RATE_LIMIT_PER_MINUTE`、`COPYPAGE_TRUST_PROXY`、`COPYPAGE_CHROMIUM_ARGS`。
+
+容器内运行需 `COPYPAGE_CHROMIUM_ARGS=--no-sandbox`(Chromium 以 root 运行时拒绝启动沙箱)。部署方式见 `deploy/README.md`(systemd 用户服务 / Docker Compose 两种)。
 
 ### 安全默认值
 

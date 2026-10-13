@@ -11,6 +11,7 @@ import { freezeDynamic, registerTimerHooks, unfreezeDynamic } from './freeze.js'
 import { detectDynamicRegions, type DynamicRegion } from './dynamic.js'
 import { detectAdaptive } from './adaptive.js'
 import { dismissOverlays, type Dismissal } from './dismiss.js'
+import { chromiumArgs } from './browser.js'
 
 export interface CaptureSiteOptions {
   viewports?: number[]
@@ -52,7 +53,7 @@ export async function captureSite(
   await mkdir(path.join(outDir, 'screenshots'), { recursive: true })
   await mkdir(path.join(outDir, 'dom'), { recursive: true })
 
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ args: chromiumArgs() })
   let snapshotAssets: string | undefined
   let snapshotCharts: string | undefined
   let snapshotDismissed: string | undefined

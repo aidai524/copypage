@@ -1,0 +1,55 @@
+name: copypage
+
+services:
+  copypage:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: copypage-server:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    # non-root: matches the owning uid of the mounted pi config and data volume
+    user: "1000:1000"
+    environment:
+      # pi reads ~/.pi; point HOME at the image's non-root user home
+      HOME: /home/pwuser
+    volumes:
+      - copypage-data:/data
+      # pi agent settings + credentials (only needed with COPYPAGE_ALLOW_AGENT=true)
+      - ${PI_CONFIG_PATH:-./pi-config}:/home/pwuser/.pi
+    # Chromium needs a larger /dev/shm and the host IPC namespace in containers
+    ipc: host
+    shm_size: 1gb
+    expose:
+      - "4400"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "fetch('http://127.0.0.1:4400/api/health',{headers:{authorization:'Bearer '+process.env.COPYPAGE_TOKEN}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      copypage:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  copypage-data:
+  caddy-data:
+  caddy-config:

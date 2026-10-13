@@ -1,0 +1,16 @@
+# SITE_ADDRESS=":80" serves plain HTTP (private network / VPN use).
+# Set a real domain (e.g. copypage.example.com) and publish port 443 to get
+# automatic HTTPS with Let's Encrypt.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	reverse_proxy copypage:4400 {
+		# SSE progress and large screenshots must stream, not buffer
+		flush_interval -1
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+	}
+}
