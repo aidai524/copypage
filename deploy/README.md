@@ -45,6 +45,15 @@ deploy/
 └── caddy/Caddyfile           # 反代(SSE 流式),可选自动 HTTPS
 ```
 
+## 0. 自检脚本(部署前/后都跑)
+
+```bash
+./deploy/check.sh                      # 校验配置 + 服务可达 + 令牌 + 指标 + 沙箱/邮件/数据库
+COPYPAGE_CHECK_URL=https://your.domain ./deploy/check.sh   # 检查远端
+```
+
+输出 `✅/⚠️/❌` 清单,有 ❌ 会以非零码退出。首次部署建议按它逐项消掉。
+
 ## 1. 准备
 
 前置:把用户加入 docker 组(需重新登录生效):
@@ -136,7 +145,21 @@ COPYPAGE_WORKER_MEMORY_MB=3072       # 单 worker 堆上限
 
 ## 6. 邮件(Resend)、监控、沙箱
 
-**邮件**:注册验证 / 找回密码 / 用户提醒 / 运维告警都走 Resend:
+**邮件(Resend 配置步骤)**:注册验证 / 找回密码 / 用户提醒 / 运维告警都走 Resend。
+
+1. 注册 https://resend.com → `Domains` → 添加你的域名,按提示加 DNS 记录(SPF/DKIM)并等待 Verified
+2. `API Keys` → 创建 key(权限选 sending access),得到 `re_…`
+3. 写入 `deploy/.env`:
+
+```ini
+COPYPAGE_RESEND_API_KEY=re_xxx
+COPYPAGE_EMAIL_FROM=CopyPage <no-reply@your-domain>   # 必须在已验证域名下
+COPYPAGE_APP_URL=https://your-domain                  # 邮件链接基址
+COPYPAGE_REQUIRE_EMAIL_VERIFICATION=true              # 公网建议开启
+COPYPAGE_ADMIN_ALERT_EMAIL=ops@your-domain            # 告警收件人
+```
+
+4. 重启服务后用真实邮箱注册一次,确认收到验证邮件;`./deploy/check.sh` 会提示 from 是否仍是占位符
 
 ```ini
 COPYPAGE_RESEND_API_KEY=re_xxx

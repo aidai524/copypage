@@ -23,7 +23,8 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm ci --no-audit --no-fund
 
 ENV NODE_ENV=production \
-    COPYPAGE_DATA_DIR=/data
+    COPYPAGE_DATA_DIR=/data \
+    COPYPAGE_CHROMIUM_ARGS=--no-sandbox
 # run as the image's non-root user (uid 1000) so host mounts stay correctly owned
 RUN mkdir -p /data && chown 1000:1000 /data
 VOLUME ["/data"]
