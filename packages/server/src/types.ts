@@ -40,6 +40,8 @@ export interface TaskResult {
 
 export interface Task {
   id: string
+  /** tenant that owns this task */
+  ownerId: string
   status: TaskStatus
   createdAt: string
   updatedAt: string
@@ -51,6 +53,10 @@ export interface Task {
   verifications: Verification[]
   /** agent-driven generation runs */
   generations: Generation[]
+  /** artifact bytes on disk (quota accounting) */
+  sizeBytes?: number
+  /** isolated worker process currently handling the job */
+  worker?: { pid?: number; startedAt?: string }
   error?: string
   result?: TaskResult
 }
@@ -119,3 +125,23 @@ export interface Generation {
   finalDecision?: string
   error?: string
 }
+
+/** event stream emitted by an isolated worker process (JSONL on stdout) */
+export type WorkerEvent =
+  | { type: 'progress'; message: string }
+  | { type: 'started'; pid: number }
+  | { type: 'loop'; loop: LoopState }
+  | { type: 'verification-result'; result: VerificationResult }
+  | {
+      type: 'verification'
+      id: string
+      round: number
+      status: VerificationStatus
+      reproDir: string
+      repro: Verification['repro']
+      result?: VerificationResult
+      error?: string
+    }
+  | { type: 'task-result'; result: TaskResult }
+  | { type: 'generation-result'; finalDecision: string; rounds: GenerationRound[] }
+  | { type: 'error'; error: string }

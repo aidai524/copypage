@@ -25,6 +25,11 @@ const agentMaxRounds = Number(arg('agent-max-rounds', '8'))
 const agentTimeoutMin = Number(arg('agent-timeout-min', '30'))
 const rateLimitPerMinute = Number(arg('rate-limit-per-minute', '120'))
 const trustProxy = flag('trust-proxy')
+const allowRegistration = flag('allow-registration')
+const adminEmail = arg('admin-email')
+const adminPassword = arg('admin-password')
+const workerConcurrency = Number(arg('worker-concurrency', '2'))
+const workerMemoryMb = Number(arg('worker-memory-mb', '3072'))
 
 const server = await startServer({
   port,
@@ -41,6 +46,11 @@ const server = await startServer({
   agentTimeoutMs: agentTimeoutMin * 60_000,
   rateLimitPerMinute,
   trustProxy,
+  allowRegistration,
+  workerConcurrency,
+  workerMemoryMb,
+  ...(adminEmail ? { adminEmail } : {}),
+  ...(adminPassword ? { adminPassword } : {}),
   ...(token ? { token } : {}),
   ...(agentModel ? { agentModel } : {}),
 })
@@ -49,6 +59,10 @@ console.log(`CopyPage capture service → ${server.url}`)
 console.log(`  data dir: ${dataDir}`)
 console.log(`  auth: ${token ? 'bearer token required' : 'OPEN (loopback only)'}`)
 console.log(`  retention: ${retentionHours}h · max tasks: ${maxTasks} · max upload: ${maxUploadMb}MB`)
+console.log(
+  `  workers: ${workerConcurrency} × ${workerMemoryMb}MB · registration: ${allowRegistration ? 'open' : 'closed'}` +
+    (adminEmail ? ` · admin: ${adminEmail}` : ''),
+)
 if (allowBuild) console.log('  ⚠ --allow-build: submitted projects run `npm run build` (arbitrary code execution)')
 if (allowPrivateNetwork) console.log('  ⚠ --allow-private-network: SSRF guard disabled (local fixtures only)')
 if (allowAgent)

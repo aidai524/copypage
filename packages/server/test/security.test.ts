@@ -96,7 +96,9 @@ describe('service security', () => {
 
   it('requires the bearer token on all api routes', async () => {
     expect((await fetch(`${server.url}/api/tasks`)).status).toBe(401)
-    expect((await fetch(`${server.url}/api/health`)).status).toBe(401)
+    // health stays reachable for liveness probes but must not leak counts
+    const health = await (await fetch(`${server.url}/api/health`)).json()
+    expect(health).toEqual({ ok: true })
     const ok = await fetch(`${server.url}/api/tasks`, {
       headers: { authorization: 'Bearer secret-test' },
     })
@@ -116,7 +118,7 @@ describe('service security', () => {
   })
 
   it('refuses to build submitted projects (RCE guard)', async () => {
-    const task = await server.store.create({ type: 'url', source: 'https://example.com' })
+    const task = await server.store.create('system', { type: 'url', source: 'https://example.com' })
     await server.store.update(task.id, {
       status: 'done',
       result: {
@@ -171,17 +173,17 @@ describe('service security', () => {
   })
 
   it('creates verification dirs and can clean up expired tasks', async () => {
-    const task = await server.store.create({ type: 'url', source: 'https://example.com' })
+    const task = await server.store.create('system', { type: 'url', source: 'https://example.com' })
     await server.store.update(task.id, { status: 'done' })
-    // backdate the in-memory record so the retention sweep considers it expired
-    server.store.get(task.id)!.updatedAt = new Date(Date.now() - 10_000).toISOString()
+    // backdate the database row so the retention sweep considers it expired
+    server.db.updateTask(task.id, { updated_at: new Date(Date.now() - 10_000).toISOString() })
     const removed = await server.store.cleanupOlderThan(500)
     expect(removed).toContain(task.id)
     expect(server.store.get(task.id)).toBeUndefined()
   })
 
   it('rejects path traversal through the files endpoint', async () => {
-    const task = await server.store.create({ type: 'url', source: 'https://example.com' })
+    const task = await server.store.create('system', { type: 'url', source: 'https://example.com' })
     await mkdir(server.store.taskDir(task.id), { recursive: true })
     const res = await fetch(
       `${server.url}/api/tasks/${task.id}/files/${encodeURIComponent('../../task.json')}?token=secret-test`,

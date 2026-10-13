@@ -25,6 +25,17 @@ export interface ServerConfig {
   rateLimitPerMinute: number
   /** trust X-Forwarded-For (only when every request goes through a proxy) */
   trustProxy: boolean
+  /** allow visitors to self-register accounts (public mode) */
+  allowRegistration: boolean
+  /** bootstrap admin credentials (created on first start) */
+  adminEmail?: string
+  adminPassword?: string
+  /** jobs running in parallel across all tenants (each runs in a child process) */
+  workerConcurrency: number
+  /** V8 heap limit for worker processes */
+  workerMemoryMb: number
+  /** default quotas by plan (per-user overrides live in the database) */
+  plans: Record<string, Quota>
   /** hard cap on stored tasks; new captures are rejected above it */
   maxTasks: number
   /** max upload size for repro zips */
@@ -33,6 +44,50 @@ export interface ServerConfig {
   retentionMs: number
   /** how often the retention sweeper runs */
   cleanupIntervalMs: number
+}
+
+export interface Quota {
+  /** stored tasks (all statuses) */
+  maxTasks: number
+  /** total artifact bytes across the user's tasks */
+  maxStorageBytes: number
+  /** agent generation runs per day */
+  maxGenerationsPerDay: number
+  /** verifications per day */
+  maxVerificationsPerDay: number
+  /** captures per day */
+  maxCapturesPerDay: number
+  /** jobs of one user running at the same time */
+  maxConcurrent: number
+}
+
+const MB = 1024 * 1024
+
+export const DEFAULT_PLANS: Record<string, Quota> = {
+  free: {
+    maxTasks: 10,
+    maxStorageBytes: 500 * MB,
+    maxGenerationsPerDay: 1,
+    maxVerificationsPerDay: 20,
+    maxCapturesPerDay: 20,
+    maxConcurrent: 1,
+  },
+  pro: {
+    maxTasks: 200,
+    maxStorageBytes: 20 * 1024 * MB,
+    maxGenerationsPerDay: 20,
+    maxVerificationsPerDay: 400,
+    maxCapturesPerDay: 400,
+    maxConcurrent: 2,
+  },
+  unlimited: {
+    maxTasks: 100_000,
+    maxStorageBytes: 1024 * 1024 * MB,
+    maxGenerationsPerDay: 100_000,
+    maxVerificationsPerDay: 100_000,
+    maxCapturesPerDay: 100_000,
+    maxConcurrent: 8,
+  },
 }
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0:0:0:0:0:0:0:1'])
@@ -71,6 +126,16 @@ export function resolveConfig(partial: Partial<ServerConfig> = {}): ServerConfig
     agentTimeoutMs: partial.agentTimeoutMs ?? Number(process.env.COPYPAGE_AGENT_TIMEOUT_MIN ?? '30') * 60_000,
     rateLimitPerMinute: partial.rateLimitPerMinute ?? Number(process.env.COPYPAGE_RATE_LIMIT_PER_MINUTE ?? '120'),
     trustProxy: partial.trustProxy ?? envBool('COPYPAGE_TRUST_PROXY', false),
+    allowRegistration: partial.allowRegistration ?? envBool('COPYPAGE_ALLOW_REGISTRATION', false),
+    workerConcurrency: partial.workerConcurrency ?? Number(process.env.COPYPAGE_WORKER_CONCURRENCY ?? '2'),
+    workerMemoryMb: partial.workerMemoryMb ?? Number(process.env.COPYPAGE_WORKER_MEMORY_MB ?? '3072'),
+    plans: partial.plans ?? DEFAULT_PLANS,
+    ...(partial.adminEmail ?? process.env.COPYPAGE_ADMIN_EMAIL
+      ? { adminEmail: partial.adminEmail ?? process.env.COPYPAGE_ADMIN_EMAIL }
+      : {}),
+    ...(partial.adminPassword ?? process.env.COPYPAGE_ADMIN_PASSWORD
+      ? { adminPassword: partial.adminPassword ?? process.env.COPYPAGE_ADMIN_PASSWORD }
+      : {}),
     maxTasks: partial.maxTasks ?? Number(process.env.COPYPAGE_MAX_TASKS ?? '50'),
     maxUploadBytes: partial.maxUploadBytes ?? Number(process.env.COPYPAGE_MAX_UPLOAD_MB ?? '200') * 1024 * 1024,
     retentionMs: partial.retentionMs ?? Number(process.env.COPYPAGE_RETENTION_HOURS ?? '168') * 3600_000,

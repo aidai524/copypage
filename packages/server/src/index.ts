@@ -2,7 +2,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApiServer } from './api.js'
 import { resolveConfig, type ServerConfig } from './config.js'
+import { Db } from './db.js'
 import { CaptureQueue } from './queue.js'
+import { resolveQuota } from './quotas.js'
 import { TaskStore } from './store.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -13,22 +15,27 @@ export interface RunningServer {
   url: string
   port: number
   config: ServerConfig
+  db: Db
   store: TaskStore
   queue: CaptureQueue
   close(): Promise<void>
 }
 
-/** Boot the capture/verify service: task store + serial queue + HTTP API/UI. */
+/** Boot the capture/verify/generate service: database + worker queue + HTTP API/UI. */
 export async function startServer(opts: StartServerOptions = {}): Promise<RunningServer> {
   const dataDir = path.resolve(opts.dataDir ?? 'work/server')
   const config: ServerConfig = { ...resolveConfig(opts), dataDir }
   const publicDir = config.publicDir ?? path.join(here, '..', 'public')
+  const repoRoot = path.resolve(here, '../../..')
 
-  const store = new TaskStore(dataDir)
-  await store.init()
-  const queue = new CaptureQueue(store, {
+  const db = new Db(dataDir)
+  const store = new TaskStore(dataDir, db)
+  const queue = new CaptureQueue({
+    store,
+    repoRoot,
+    concurrency: config.workerConcurrency,
+    memoryMb: config.workerMemoryMb,
     allowBuild: config.allowBuild,
-    repoRoot: path.resolve(here, '../../..'),
     agent: {
       command: config.agentCommand,
       args: config.agentArgs,
@@ -36,8 +43,13 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
       timeoutMs: config.agentTimeoutMs,
       ...(config.agentModel ? { model: config.agentModel } : {}),
     },
+    quotaForOwner: (ownerId) => resolveQuota(db.getUserById(ownerId), config),
   })
-  const server = createApiServer({ store, queue, publicDir, config })
+
+  const authRequired = () =>
+    Boolean(config.token) || Boolean(config.adminEmail) || db.countUsers() > 0
+
+  const server = createApiServer({ store, queue, db, config, publicDir, authRequired })
 
   await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve))
   const addr = server.address()
@@ -45,6 +57,7 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
 
   const sweep = () => {
     void store.cleanupOlderThan(config.retentionMs).catch(() => {})
+    db.pruneSessions()
   }
   sweep()
   const timer = setInterval(sweep, config.cleanupIntervalMs)
@@ -54,18 +67,28 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
     url: `http://${config.host}:${port}`,
     port,
     config,
+    db,
     store,
     queue,
     close: () =>
       new Promise<void>((resolve, reject) => {
         clearInterval(timer)
-        server.close((err) => (err ? reject(err) : resolve()))
+        server.close((err) => {
+          if (err) {
+            reject(err)
+            return
+          }
+          db.close()
+          resolve()
+        })
       }),
   }
 }
 
-export { TaskStore, CaptureQueue }
+export { TaskStore, CaptureQueue, Db }
 export * from './types.js'
 export { resolveConfig, isLoopbackHost } from './config.js'
-export type { ServerConfig } from './config.js'
+export type { ServerConfig, Quota } from './config.js'
 export { assertPublicUrl, isPrivateAddress, SecurityError } from './security.js'
+export { checkQuota, resolveQuota, quotaUsage } from './quotas.js'
+export { authenticate, hashPassword, verifyPassword } from './auth.js'

@@ -109,7 +109,32 @@ docker compose up -d --build                     # 升级:git pull 后重建
 - 备份:`docker run --rm -v copypage-data:/data -v "$PWD":/backup alpine tar czf /backup/copypage-backup.tgz -C /data .`
 - 单次 pump.fun 规模捕获约 150MB,按 `COPYPAGE_MAX_TASKS` 与保留时长估算容量
 
-## 5. 公网暴露前
+## 5. 公开多租户模式
+
+```bash
+# deploy/.env
+COPYPAGE_ALLOW_REGISTRATION=true
+COPYPAGE_ADMIN_EMAIL=you@example.com
+COPYPAGE_ADMIN_PASSWORD=强密码
+COPYPAGE_TOKEN=仍然保留(运维/健康检查用,持有者等同管理员)
+COPYPAGE_WORKER_CONCURRENCY=4        # 按 CPU/内存调整:每任务一个浏览器进程
+COPYPAGE_WORKER_MEMORY_MB=3072       # 单 worker 堆上限
+```
+
+重启后:
+
+- 访客可在 UI 自助注册;首登管理员的账号是上面配置的邮箱
+- UI 顶部出现「管理」标签:用户列表(暂停/恢复、切换套餐 free/pro/unlimited)、域名封禁、审计日志、统计
+- 配额默认:free 10 任务 / 500MB / 每日 1 次自动生成;pro 200 / 20GB / 20。单用户可在管理页用 PATCH 覆盖
+- 每个任务在独立 worker 进程执行(崩溃隔离、内存上限),失败任务在 UI 里可见原因
+
+运营建议:
+
+- 先用「域名封禁」阻断被滥用的站点;对可疑账号直接「暂停」(全站 403)
+- `copypage.db`(SQLite,在数据卷内)与任务产物一起备份;保留时长由 `COPYPAGE_RETENTION_HOURS` 控制
+- 生成功能成本高:保持 `COPYPAGE_ALLOW_AGENT=false`,或在 free 套餐把「今日生成」设为 0/1
+
+## 6. 公网暴露前
 
 - `SITE_ADDRESS=你的域名`,发布 443;Caddy 会自动申请证书
 - 确认 `COPYPAGE_TOKEN` 为强随机值、必要时轮换

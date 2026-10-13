@@ -6,64 +6,40 @@
 <title>CopyPage · 捕获服务</title>
 <style>
   :root {
-    --bg: #0b0b0e;
-    --panel: #131316;
-    --panel-2: #1b1b1f;
-    --border: #232327;
-    --text: #e4e4e7;
-    --dim: #a1a1aa;
-    --faint: #71717a;
-    --green: #4ade80;
-    --red: #f87171;
-    --blue: #60a5fa;
-    --amber: #fbbf24;
+    --bg: #0b0b0e; --panel: #131316; --panel-2: #1b1b1f; --border: #232327;
+    --text: #e4e4e7; --dim: #a1a1aa; --faint: #71717a;
+    --green: #4ade80; --red: #f87171; --blue: #60a5fa; --amber: #fbbf24;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
-  header {
-    display: flex; align-items: center; gap: 12px;
-    height: 52px; padding: 0 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--panel);
-    position: sticky; top: 0; z-index: 5;
-  }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
   header h1 { font-size: 15px; font-weight: 600; margin: 0; }
   header .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--green); }
   header .meta { margin-left: auto; color: var(--faint); font-size: 12px; }
-  header .auth { display: flex; gap: 6px; align-items: center; margin-left: 16px; }
-  header .auth input { width: 170px; height: 28px; padding: 0 8px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 12px; }
-  header .auth button { height: 28px; padding: 0 10px; font-size: 12px; }
-  .banner { margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px; background: rgba(251,191,36,.12); color: var(--amber); font-size: 13px; display: none; }
+  header .spacer { flex: 1; }
+  header button.tab { background: transparent; color: var(--dim); border: 1px solid transparent; height: 30px; padding: 0 12px; }
+  header button.tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
   main { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; padding: 20px; align-items: start; }
+  main.admin { grid-template-columns: minmax(0, 1fr) 360px; }
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
   .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin: 0; padding: 14px 16px 8px; }
-  form { padding: 0 16px 16px; display: grid; gap: 10px; }
+  form.inline { padding: 0 16px 16px; display: grid; gap: 10px; }
   label { display: grid; gap: 6px; font-size: 12px; color: var(--dim); }
-  input[type=text], select {
-    width: 100%; height: 34px; padding: 0 10px;
-    background: var(--panel-2); color: var(--text);
+  input[type=text], input[type=email], input[type=password], select {
+    width: 100%; height: 34px; padding: 0 10px; background: var(--panel-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px; font: inherit;
   }
-  input[type=text]:focus, select:focus { outline: 1px solid var(--blue); border-color: transparent; }
-  .row { display: flex; gap: 8px; align-items: center; }
+  input:focus, select:focus { outline: 1px solid var(--blue); border-color: transparent; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .checks { display: flex; gap: 14px; font-size: 12px; color: var(--dim); }
   .checks label { display: flex; align-items: center; gap: 6px; }
-  button {
-    height: 34px; padding: 0 14px; border: 0; border-radius: 6px;
-    background: var(--green); color: #052e16; font: inherit; font-weight: 600; cursor: pointer;
-  }
+  button { height: 34px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--green); color: #052e16; font: inherit; font-weight: 600; cursor: pointer; }
   button:disabled { opacity: .5; cursor: default; }
   button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
-  .tasks { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; gap: 4px; max-height: 60vh; overflow: auto; }
-  .tasks li {
-    padding: 9px 10px; border-radius: 8px; cursor: pointer;
-    border: 1px solid transparent;
-  }
+  button.danger { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid var(--border); font-weight: 500; }
+  button.small { height: 26px; padding: 0 9px; font-size: 12px; }
+  .tasks { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; gap: 4px; max-height: 56vh; overflow: auto; }
+  .tasks li { padding: 9px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
   .tasks li:hover { background: var(--panel-2); }
   .tasks li.active { background: var(--panel-2); border-color: var(--border); }
   .tasks .line1 { display: flex; align-items: center; gap: 8px; }
@@ -74,6 +50,10 @@
   .chip.running { background: rgba(96,165,250,.15); color: var(--blue); }
   .chip.done { background: rgba(74,222,128,.15); color: var(--green); }
   .chip.failed { background: rgba(248,113,113,.15); color: var(--red); }
+  .chip.pass { background: rgba(74,222,128,.15); color: var(--green); }
+  .chip.continue { background: rgba(96,165,250,.15); color: var(--blue); }
+  .chip.escalate { background: rgba(251,191,36,.15); color: var(--amber); }
+  .chip.stagnant-stop, .chip.cap-stop { background: rgba(248,113,113,.15); color: var(--red); }
   .detail { padding: 16px; }
   .detail .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .detail .head h3 { margin: 0; font-size: 15px; word-break: break-all; }
@@ -82,33 +62,24 @@
   .cell { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
   .cell .k { font-size: 11px; color: var(--faint); }
   .cell .v { font-size: 14px; margin-top: 2px; word-break: break-all; }
-  .log {
-    background: #0e0e11; border: 1px solid var(--border); border-radius: 8px;
-    font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
-    color: var(--dim); max-height: 210px; overflow: auto; padding: 10px 12px; white-space: pre-wrap;
-  }
+  .log { background: #0e0e11; border: 1px solid var(--border); border-radius: 8px; font: 12px/1.6 ui-monospace, Menlo, monospace; color: var(--dim); max-height: 220px; overflow: auto; padding: 10px 12px; white-space: pre-wrap; }
   .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 12px; }
   .shot { background: var(--panel-2); border-radius: 8px; overflow: hidden; }
   .shot .bar { display: flex; align-items: center; padding: 8px 10px; font-size: 12px; color: var(--dim); }
   .shot .bar a { margin-left: auto; color: var(--blue); text-decoration: none; font-size: 12px; }
   .shot img { display: block; width: 100%; max-height: 320px; object-fit: cover; object-position: top; background: #000; }
   .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .links a {
-    font-size: 12px; color: var(--dim); text-decoration: none;
-    border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; background: var(--panel-2);
-  }
+  .links a { font-size: 12px; color: var(--dim); text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; background: var(--panel-2); }
   .links a:hover { color: var(--text); border-color: var(--faint); }
-  .error { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(248,113,113,.12); color: var(--red); font-size: 13px; }
+  .error { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(248,113,113,.12); color: var(--red); font-size: 13px; white-space: pre-wrap; }
   .hint { color: var(--faint); padding: 28px 4px; }
-  section.panel { min-height: 200px; }
   .vform { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0 14px; }
-  .vform input[type=text] { flex: 1; min-width: 240px; }
+  .vform input[type=text] { flex: 1; min-width: 220px; }
   .vform .note { color: var(--faint); font-size: 12px; width: 100%; }
   .vrun { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--panel-2); }
   .vrun .vhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .vrun .vhead b { font-size: 13px; }
   .vrun .vhead .time { color: var(--faint); font-size: 11px; }
-  .vrun .vhead .spacer { flex: 1; }
   .vmetrics { display: flex; gap: 18px; margin: 10px 0 6px; flex-wrap: wrap; }
   .vmetrics .m { font-size: 12px; color: var(--faint); }
   .vmetrics .m b { display: block; font-size: 17px; color: var(--text); }
@@ -119,145 +90,209 @@
   .entries th { color: var(--faint); font-weight: 500; }
   .entries .sev { color: var(--amber); }
   .entries .exp { color: var(--green); } .entries .act { color: var(--red); }
-  .chip.pass { background: rgba(74,222,128,.15); color: var(--green); }
-  .chip.continue { background: rgba(96,165,250,.15); color: var(--blue); }
-  .chip.escalate { background: rgba(251,191,36,.15); color: var(--amber); }
-  .chip.stagnant-stop, .chip.cap-stop { background: rgba(248,113,113,.15); color: var(--red); }
+  .banner { margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px; background: rgba(251,191,36,.12); color: var(--amber); font-size: 13px; display: none; }
+  .authcard { max-width: 420px; margin: 60px auto; }
+  .quota { display: grid; gap: 6px; margin: 10px 0 14px; }
+  .qbar { height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+  .qbar > i { display: block; height: 100%; background: var(--blue); }
+  .qbar.warn > i { background: var(--amber); }
+  .qbar.full > i { background: var(--red); }
+  table.admin { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.admin th, table.admin td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.admin th { color: var(--faint); font-weight: 500; font-size: 12px; }
+  .muted { color: var(--faint); font-size: 12px; }
 </style>
 </head>
 <body>
 <header>
   <span class="dot"></span>
-  <h1>CopyPage · 捕获服务</h1>
+  <h1>CopyPage</h1>
+  <button class="tab" id="tab-tasks" style="margin-left:12px">任务</button>
+  <button class="tab" id="tab-admin" style="display:none">管理</button>
+  <span class="spacer"></span>
   <span class="meta" id="health">…</span>
-  <div class="auth">
-    <input type="password" id="token" placeholder="访问令牌（服务器设置了才需要）" />
-    <button id="token-save">保存</button>
-  </div>
+  <span class="meta" id="whoami"></span>
+  <button class="ghost small" id="logout" style="display:none">退出</button>
 </header>
 <div class="banner" id="banner"></div>
-
-<main>
-  <aside class="panel">
-    <h2>新建捕获</h2>
-    <form id="new-task">
-      <div class="row">
-        <select id="type" style="width:110px">
-          <option value="url">URL</option>
-          <option value="image">图片路径</option>
-          <option value="video">视频路径</option>
-        </select>
-        <input type="text" id="source" placeholder="https://example.com" required />
-      </div>
-      <label>视口宽度（逗号分隔）
-        <input type="text" id="viewports" value="1440,768,375" />
-      </label>
-      <div class="checks">
-        <label><input type="checkbox" id="dynamic" checked /> 动态区域检测</label>
-        <label><input type="checkbox" id="states" /> 交互态捕获（慢）</label>
-      </div>
-      <div class="row">
-        <label style="flex:1">DOM 节点上限
-          <input type="text" id="maxNodes" value="4000" />
-        </label>
-        <button type="submit" id="submit">开始捕获</button>
-      </div>
-    </form>
-    <h2>任务</h2>
-    <ul class="tasks" id="tasks"></ul>
-  </aside>
-
-  <section class="panel" id="detail">
-    <p class="hint">创建或选择一个任务查看详情。</p>
-  </section>
+<main id="app">
+  <aside class="panel" id="sidebar"></aside>
+  <section class="panel" id="detail"><p class="hint">加载中…</p></section>
 </main>
 
 <script>
   const $ = (s) => document.querySelector(s)
-  const state = { tasks: [], selected: null }
+  const state = { me: null, tasks: [], selected: null, view: 'tasks', admin: { users: [], blocks: [], audit: [], stats: null } }
   const tokenStore = {
     get() { return localStorage.getItem('copypage-token') || '' },
     set(v) { v ? localStorage.setItem('copypage-token', v) : localStorage.removeItem('copypage-token') },
-  }
-  function apiFetch(path, init = {}) {
-    const headers = { ...(init.headers || {}) }
-    const token = tokenStore.get()
-    if (token) headers.authorization = 'Bearer ' + token
-    return fetch(path, { ...init, headers })
-  }
-  function banner(msg) {
-    const el = $('#banner')
-    el.textContent = msg || ''
-    el.style.display = msg ? 'block' : 'none'
   }
   const STATUS = { queued: '排队中', running: '捕获中', done: '完成', failed: '失败' }
   const VSTATUS = { queued: '排队中', running: '验证中', done: '完成', failed: '失败' }
   const DECISION = { pass: '通过', continue: '继续迭代', escalate: '升级诊断', 'stagnant-stop': '停滞终止', 'cap-stop': '轮次上限' }
 
+  function api(path, init = {}) {
+    const headers = { ...(init.headers || {}) }
+    const token = tokenStore.get()
+    if (token) headers.authorization = 'Bearer ' + token
+    return fetch(path, { credentials: 'same-origin', ...init, headers })
+  }
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-  const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('zh-CN', { hour12: false }) }
+  const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('zh-CN', { hour12: false }) }
+  const fmtBytes = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n > 1024 ? (n / 1024).toFixed(0) + ' KB' : (n || 0) + ' B')
   const fmtDuration = (ms) => (ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms')
+  function banner(msg) { const el = $('#banner'); el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none' }
+  function upsert(task) { const i = state.tasks.findIndex((t) => t.id === task.id); if (i >= 0) state.tasks[i] = task; else state.tasks.unshift(task) }
 
-  function upsert(task) {
-    const i = state.tasks.findIndex((t) => t.id === task.id)
-    if (i >= 0) state.tasks[i] = task
-    else state.tasks.unshift(task)
+  // ---------- auth ----------
+
+  function renderAuth() {
+    $('#sidebar').innerHTML = `
+      <h2>登录 / 注册</h2>
+      <form class="inline" id="login-form">
+        <label>邮箱<input type="email" id="login-email" required /></label>
+        <label>密码<input type="password" id="login-password" required minlength="8" /></label>
+        <div class="row"><button type="submit">登录</button>
+        <button type="button" class="ghost" id="show-register">没有账号?注册</button></div>
+      </form>
+      <form class="inline" id="register-form" style="display:none">
+        <label>邮箱<input type="email" id="reg-email" required /></label>
+        <label>密码(至少 8 位)<input type="password" id="reg-password" required minlength="8" /></label>
+        <div class="row"><button type="submit">注册</button>
+        <button type="button" class="ghost" id="show-login">已有账号?登录</button></div>
+      </form>
+      <form class="inline">
+        <label>访问令牌(私有部署可选)<input type="password" id="token" placeholder="COPYPAGE_TOKEN" /></label>
+        <button type="button" class="ghost" id="token-save">使用令牌</button>
+      </form>`
+    $('#detail').innerHTML = '<p class="hint">登录后即可提交捕获、验证与自动生成任务。</p>'
+    $('#whoami').textContent = ''
+    $('#logout').style.display = 'none'
+    $('#tab-admin').style.display = 'none'
+
+    const post = async (path, body, btn) => {
+      btn.disabled = true
+      try {
+        const res = await api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error || res.statusText)
+        await boot()
+      } catch (err) { banner(err.message) } finally { btn.disabled = false }
+    }
+    $('#show-register').onclick = () => { $('#login-form').style.display = 'none'; $('#register-form').style.display = 'grid' }
+    $('#show-login').onclick = () => { $('#login-form').style.display = 'grid'; $('#register-form').style.display = 'none' }
+    $('#login-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/login', { email: $('#login-email').value, password: $('#login-password').value }, e.submitter ?? e.target.querySelector('button')) }
+    $('#register-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/register', { email: $('#reg-email').value, password: $('#reg-password').value }, e.submitter ?? e.target.querySelector('button')) }
+    $('#token-save').onclick = () => { tokenStore.set($('#token').value.trim()); location.reload() }
+    $('#token').value = tokenStore.get()
+  }
+
+  // ---------- sidebar ----------
+
+  function renderSidebar() {
+    const q = state.me?.quota
+    const totals = state.me?.totals ?? { tasks: 0, storageBytes: 0 }
+    const usage = state.me?.usage ?? {}
+    const bar = (used, max, label) => {
+      const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0
+      const cls = pct >= 100 ? 'full' : pct >= 80 ? 'warn' : ''
+      return `<div><div class="muted">${label}: ${typeof used === 'number' && label.includes('存储') ? fmtBytes(used) : used} / ${label.includes('存储') ? fmtBytes(max) : max}</div><div class="qbar ${cls}"><i style="width:${pct}%"></i></div></div>`
+    }
+    const quotaHtml = q
+      ? `<div class="quota">
+           ${bar(totals.tasks, q.maxTasks, '任务数')}
+           ${bar(totals.storageBytes, q.maxStorageBytes, '存储')}
+           ${bar(usage.generate ?? 0, q.maxGenerationsPerDay, '今日生成')}
+           ${bar(usage.capture ?? 0, q.maxCapturesPerDay, '今日捕获')}
+         </div>`
+      : ''
+
+    $('#sidebar').innerHTML = `
+      ${quotaHtml}
+      <h2>新建捕获</h2>
+      <form class="inline" id="new-task">
+        <div class="row">
+          <select id="type" style="width:110px">
+            <option value="url">URL</option>
+            <option value="image">图片路径</option>
+            <option value="video">视频路径</option>
+          </select>
+          <input type="text" id="source" placeholder="https://example.com" required />
+        </div>
+        <label>视口宽度(逗号分隔)<input type="text" id="viewports" value="1440,768,375" /></label>
+        <div class="checks">
+          <label><input type="checkbox" id="dynamic" checked /> 动态区域检测</label>
+          <label><input type="checkbox" id="states" /> 交互态捕获(慢)</label>
+        </div>
+        <div class="row">
+          <label style="flex:1">DOM 节点上限<input type="text" id="maxNodes" value="4000" /></label>
+          <button type="submit" id="submit">开始捕获</button>
+        </div>
+      </form>
+      <h2>任务</h2>
+      <ul class="tasks" id="tasks"></ul>`
+    renderTasks()
+
+    $('#new-task').onsubmit = async (e) => {
+      e.preventDefault()
+      const btn = $('#submit')
+      btn.disabled = true
+      try {
+        const viewports = $('#viewports').value.split(',').map((s) => Number(s.trim())).filter(Boolean)
+        const body = {
+          type: $('#type').value,
+          source: $('#source').value.trim(),
+          options: { viewports, maxNodes: Number($('#maxNodes').value) || 4000, dynamic: $('#dynamic').checked, states: $('#states').checked },
+        }
+        const res = await api('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || res.statusText)
+        upsert(data.task); state.selected = data.task.id
+        renderTasks(); renderDetail()
+      } catch (err) { banner('创建任务失败:' + err.message) } finally { btn.disabled = false }
+    }
   }
 
   function renderTasks() {
     const el = $('#tasks')
+    if (!el) return
     if (state.tasks.length === 0) { el.innerHTML = '<li class="hint" style="padding:6px 10px">暂无任务</li>'; return }
     el.innerHTML = state.tasks.map((t) => `
       <li data-id="${t.id}" class="${state.selected === t.id ? 'active' : ''}">
-        <div class="line1">
-          <span class="src">${esc(t.input.source)}</span>
-          <span class="chip ${t.status}">${STATUS[t.status]}</span>
-        </div>
-        <div class="line1">
-          <span class="time">${esc(t.id)} · ${fmtTime(t.createdAt)}</span>
-        </div>
+        <div class="line1"><span class="src">${esc(t.input.source)}</span><span class="chip ${t.status}">${STATUS[t.status]}</span></div>
+        <div class="line1"><span class="time">${esc(t.id)} · ${fmtTime(t.createdAt)}</span></div>
       </li>`).join('')
-    for (const li of el.querySelectorAll('li[data-id]')) {
-      li.onclick = () => { state.selected = li.dataset.id; renderTasks(); renderDetail() }
-    }
+    for (const li of el.querySelectorAll('li[data-id]')) li.onclick = () => { state.selected = li.dataset.id; renderTasks(); renderDetail() }
   }
 
-  function artifactUrl(task, rel) { return `/api/tasks/${task.id}/artifacts/${rel}` }
-  function fileUrl(task, rel) { return `/api/tasks/${task.id}/files/${rel}` }
+  // ---------- detail ----------
+
+  const artifactUrl = (t, rel) => `/api/tasks/${t.id}/artifacts/${rel}`
+  const fileUrl = (t, rel) => `/api/tasks/${t.id}/files/${rel}`
 
   function renderGenerations(t) {
     if (t.status !== 'done') return ''
     const runs = [...(t.generations || [])].reverse()
-    const runsHtml = runs
-      .map((g) => {
-        const rounds = g.rounds && g.rounds.length
-          ? `<div class="vmetrics">${g.rounds
-              .map(
-                (r) =>
-                  `<div class="m">第 ${r.round} 轮 ${esc(DECISION[r.decision] || r.decision)}<b>${r.metrics.ssim} / ${r.metrics.pixelDiffPct}%</b></div>`,
-              )
-              .join('')}</div>`
-          : ''
-        const log = g.progress && g.progress.length
-          ? `<div class="vlog">${g.progress.slice(-40).map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')}</div>`
-          : ''
-        return `<div class="vrun">
-          <div class="vhead">
-            <b>生成运行 ${esc(g.id)}</b>
-            <span class="chip ${g.status}">${VSTATUS[g.status]}</span>
-            ${g.finalDecision ? `<span class="chip ${g.finalDecision}">${DECISION[g.finalDecision] || g.finalDecision}</span>` : ''}
-            <span class="time">${esc(g.agent.command)}${g.agent.model ? ' (' + esc(g.agent.model) + ')' : ''} · ${fmtTime(g.createdAt)}</span>
-          </div>
-          ${g.error ? `<div class="error">${esc(g.error)}</div>` : ''}
-          ${rounds}${log}
-        </div>`
-      })
-      .join('')
+    const runsHtml = runs.map((g) => {
+      const rounds = g.rounds && g.rounds.length
+        ? `<div class="vmetrics">${g.rounds.map((r) => `<div class="m">第 ${r.round} 轮 ${esc(DECISION[r.decision] || r.decision)}<b>${r.metrics.ssim} / ${r.metrics.pixelDiffPct}%</b></div>`).join('')}</div>`
+        : ''
+      const log = g.progress && g.progress.length
+        ? `<div class="vlog">${g.progress.slice(-40).map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')}</div>`
+        : ''
+      return `<div class="vrun">
+        <div class="vhead"><b>生成运行 ${esc(g.id)}</b>
+          <span class="chip ${g.status}">${VSTATUS[g.status]}</span>
+          ${g.finalDecision ? `<span class="chip ${g.finalDecision}">${DECISION[g.finalDecision] || g.finalDecision}</span>` : ''}
+          <span class="time">${esc(g.agent.command)}${g.agent.model ? ' (' + esc(g.agent.model) + ')' : ''} · ${fmtTime(g.createdAt)}</span>
+        </div>
+        ${g.error ? `<div class="error">${esc(g.error)}</div>` : ''}${rounds}${log}</div>`
+    }).join('')
     return `
       <h2 style="padding:18px 0 0">自动生成还原工程</h2>
       <div class="vform">
         <button id="generate-btn">启动自动生成</button>
-        <div class="note">服务端以 --allow-agent 启动后可用：agent（pi）按 copypage skill 读取快照生成工程，每轮由服务端验证并回传差异清单，直到收敛。每轮产生一条验证记录（见下方）。</div>
+        <div class="note">agent(pi)按 copypage skill 读取快照生成工程,每轮由服务端验证并回传差异清单,直到收敛。</div>
       </div>
       ${runsHtml || '<p class="hint" style="padding:0">还没有生成记录</p>'}`
   }
@@ -268,125 +303,95 @@
     btn.onclick = async () => {
       btn.disabled = true
       try {
-        const res = await apiFetch(`/api/tasks/${t.id}/generate`, { method: 'POST' })
+        const res = await api(`/api/tasks/${t.id}/generate`, { method: 'POST' })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || res.statusText)
         upsert(data.task); renderTasks(); renderDetail()
-      } catch (err) {
-        alert('启动生成失败：' + err.message)
-      } finally {
-        btn.disabled = false
-      }
+      } catch (err) { banner('启动生成失败:' + err.message) } finally { btn.disabled = false }
     }
   }
 
   function renderVerifications(t) {
     if (t.status !== 'done') return ''
     const runs = [...(t.verifications || [])].reverse()
-    const runsHtml = runs
-      .map((v) => {
-        const r = v.result
-        const metrics = r
-          ? `<div class="vmetrics">
-               <div class="m">SSIM<b>${r.metrics.ssim}</b></div>
-               <div class="m">像素差异<b>${r.metrics.pixelDiffPct}%</b></div>
-               ${r.metrics.dynamicAreaPct !== undefined ? `<div class="m">动态区域<b>${r.metrics.dynamicAreaPct}%</b></div>` : ''}
-               <div class="m">差异条目<b>${r.entries}</b></div>
-               <div class="m">耗时<b>${fmtDuration(r.durationMs)}</b></div>
-             </div>`
-          : ''
-        const links = r
-          ? `<div class="vlinks">
-               <a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.report)}" target="_blank">对比报告 ↗</a>
-               ${r.heatmaps.map((h) => `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + h)}" target="_blank">热力图 ${h.match(/heatmap-(\d+)/)?.[1] ?? ''}px ↗</a>`).join('')}
-               ${r.vlmRequests ? `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.vlmRequests)}" target="_blank">VLM 请求队列 ↗</a>` : ''}
-             </div>`
-          : ''
-        const entries = r && r.topEntries.length
-          ? `<table class="entries">
-               <thead><tr><th>severity</th><th>元素</th><th>属性</th><th>原站</th><th>还原</th></tr></thead>
-               <tbody>${r.topEntries.map((e) => `<tr><td class="sev">${e.severity}</td><td>${esc(e.element)}</td><td>${esc(e.property)}</td><td class="exp">${esc(e.expected)}</td><td class="act">${esc(e.actual)}</td></tr>`).join('')}</tbody>
-             </table>`
-          : ''
-        const log = v.progress.length
-          ? `<div class="vlog">${v.progress.map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')}</div>`
-          : ''
-        return `<div class="vrun" data-vid="${v.id}">
-          <div class="vhead">
-            <b>第 ${v.round} 轮</b>
-            <span class="chip ${v.status}">${VSTATUS[v.status]}</span>
-            ${r ? `<span class="chip ${r.decision}">${DECISION[r.decision] || r.decision}</span>` : ''}
-            <span class="time">${esc(v.repro.type)}: ${esc(v.repro.source)} · ${fmtTime(v.createdAt)}</span>
-          </div>
-          ${v.error ? `<div class="error">${esc(v.error)}</div>` : ''}
-          ${metrics}${links}${entries}${log}
-        </div>`
-      })
-      .join('')
-
+    const runsHtml = runs.map((v) => {
+      const r = v.result
+      const metrics = r
+        ? `<div class="vmetrics">
+             <div class="m">SSIM<b>${r.metrics.ssim}</b></div>
+             <div class="m">像素差异<b>${r.metrics.pixelDiffPct}%</b></div>
+             ${r.metrics.dynamicAreaPct !== undefined ? `<div class="m">动态区域<b>${r.metrics.dynamicAreaPct}%</b></div>` : ''}
+             <div class="m">差异条目<b>${r.entries}</b></div>
+             <div class="m">耗时<b>${fmtDuration(r.durationMs)}</b></div>
+           </div>`
+        : ''
+      const links = r
+        ? `<div class="vlinks">
+             <a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.report)}" target="_blank">对比报告 ↗</a>
+             ${r.heatmaps.map((h) => `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + h)}" target="_blank">热力图 ${h.match(/heatmap-(\d+)/)?.[1] ?? ''}px ↗</a>`).join('')}
+             ${r.vlmRequests ? `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.vlmRequests)}" target="_blank">VLM 请求队列 ↗</a>` : ''}
+           </div>`
+        : ''
+      const entries = r && r.topEntries.length
+        ? `<table class="entries"><thead><tr><th>severity</th><th>元素</th><th>属性</th><th>原站</th><th>还原</th></tr></thead>
+           <tbody>${r.topEntries.map((e) => `<tr><td class="sev">${e.severity}</td><td>${esc(e.element)}</td><td>${esc(e.property)}</td><td class="exp">${esc(e.expected)}</td><td class="act">${esc(e.actual)}</td></tr>`).join('')}</tbody></table>`
+        : ''
+      const log = v.progress.length ? `<div class="vlog">${v.progress.map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')}</div>` : ''
+      return `<div class="vrun" data-vid="${v.id}">
+        <div class="vhead"><b>第 ${v.round} 轮</b>
+          <span class="chip ${v.status}">${VSTATUS[v.status]}</span>
+          ${r ? `<span class="chip ${r.decision}">${DECISION[r.decision] || r.decision}</span>` : ''}
+          <span class="time">${esc(v.repro.type)}: ${esc(v.repro.source)} · ${fmtTime(v.createdAt)}</span>
+        </div>
+        ${v.error ? `<div class="error">${esc(v.error)}</div>` : ''}${metrics}${links}${entries}${log}</div>`
+    }).join('')
     const history = (t.loop?.history || []).length
-      ? `<div class="note" style="color:var(--faint);font-size:12px;margin-bottom:8px">收敛历史：${t.loop.history.map((h, i) => `r${i + 1} ${h.ssim}/${h.pixelDiffPct}%`).join(' → ')}${t.loop.escalated ? ' · 已升级诊断' : ''}</div>`
+      ? `<div class="muted" style="margin-bottom:8px">收敛历史:${t.loop.history.map((h, i) => `r${i + 1} ${h.ssim}/${h.pixelDiffPct}%`).join(' → ')}${t.loop.escalated ? ' · 已升级诊断' : ''}</div>`
       : ''
-
     return `
       <h2 style="padding:18px 0 0">验证还原页</h2>
       <div class="vform">
-        <input type="text" id="verify-path" placeholder="还原工程目录（服务器本地路径，如 work/…/repro）" />
+        <input type="text" id="verify-path" placeholder="还原工程目录(管理员可用服务器本地路径)" />
         <button id="verify-path-btn">验证路径</button>
         <button class="ghost" id="verify-zip-btn">上传 zip 并验证</button>
         <input type="file" id="verify-zip" accept=".zip" style="display:none" />
-        <div class="note">流水线与本地完全一致：captureRepro（构建 + 同一探测脚本）→ diff（动态区域遮罩）→ 报告 → 收敛判定</div>
+        <div class="note">流水线与本地一致:captureRepro(构建 + 同一探测脚本)→ diff(动态区域遮罩)→ 报告 → 收敛判定。普通租户请用 zip 上传。</div>
       </div>
-      ${history}
-      ${runsHtml || '<p class="hint" style="padding:0">还没有验证记录</p>'}`
+      ${history}${runsHtml || '<p class="hint" style="padding:0">还没有验证记录</p>'}`
   }
 
   function wireVerification(t) {
-    const pathInput = $('#verify-path')
-    const pathBtn = $('#verify-path-btn')
-    const zipBtn = $('#verify-zip-btn')
-    const zipInput = $('#verify-zip')
+    const pathInput = $('#verify-path'), pathBtn = $('#verify-path-btn'), zipBtn = $('#verify-zip-btn'), zipInput = $('#verify-zip')
     if (!pathBtn || !zipBtn) return
-
     const post = async (body, headers = {}) => {
-      const res = await apiFetch(`/api/tasks/${t.id}/verifications`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...headers },
-        body,
-      })
+      const res = await api(`/api/tasks/${t.id}/verifications`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || res.statusText)
       return data
     }
-
     pathBtn.onclick = async () => {
       const source = pathInput.value.trim()
-      if (!source) return alert('请输入还原工程路径')
+      if (!source) return banner('请输入还原工程路径')
       pathBtn.disabled = true
-      try {
-        const data = await post(JSON.stringify({ repro: { type: 'path', source } }))
-        upsert(data.task); renderTasks(); renderDetail()
-      } catch (err) { alert('验证失败：' + err.message) } finally { pathBtn.disabled = false }
+      try { const data = await post(JSON.stringify({ repro: { type: 'path', source } })); upsert(data.task); renderTasks(); renderDetail() }
+      catch (err) { banner('验证失败:' + err.message) } finally { pathBtn.disabled = false }
     }
-
     zipBtn.onclick = () => zipInput.click()
     zipInput.onchange = async () => {
       const file = zipInput.files && zipInput.files[0]
       if (!file) return
       zipBtn.disabled = true
-      try {
-        const data = await post(file, { 'content-type': 'application/zip', 'x-filename': file.name })
-        upsert(data.task); renderTasks(); renderDetail()
-      } catch (err) { alert('上传失败：' + err.message) } finally { zipBtn.disabled = false; zipInput.value = '' }
+      try { const data = await post(file, { 'content-type': 'application/zip', 'x-filename': file.name }); upsert(data.task); renderTasks(); renderDetail() }
+      catch (err) { banner('上传失败:' + err.message) } finally { zipBtn.disabled = false; zipInput.value = '' }
     }
   }
 
   function renderDetail() {
     const el = $('#detail')
+    if (state.view === 'admin') { renderAdmin(el); return }
     const t = state.tasks.find((x) => x.id === state.selected)
     if (!t) { el.innerHTML = '<p class="hint">创建或选择一个任务查看详情。</p>'; return }
     const keepPath = $('#verify-path') ? $('#verify-path').value : ''
-
     const r = t.result
     const cells = [
       r?.title ? ['页面标题', esc(r.title)] : null,
@@ -397,110 +402,172 @@
       r ? ['资产', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`] : null,
       r ? ['动态区域', `${r.dynamicRegions} 处`] : null,
       r ? ['自动关闭弹窗', r.dismissed] : null,
+      t.worker?.pid ? ['Worker PID', t.worker.pid] : null,
+      t.sizeBytes ? ['占用', fmtBytes(t.sizeBytes)] : null,
     ].filter(Boolean)
-
     const shots = r ? Object.entries(r.screenshots).map(([w, rel]) => `
-      <div class="shot">
-        <div class="bar"><span>${w}px 全页截图</span><a href="${artifactUrl(t, rel)}" target="_blank">打开原图 ↗</a></div>
-        <a href="${artifactUrl(t, rel)}" target="_blank"><img loading="lazy" src="${artifactUrl(t, rel)}" alt="" /></a>
-      </div>`).join('') : ''
-
+      <div class="shot"><div class="bar"><span>${w}px 全页截图</span><a href="${artifactUrl(t, rel)}" target="_blank">打开原图 ↗</a></div>
+      <a href="${artifactUrl(t, rel)}" target="_blank"><img loading="lazy" src="${artifactUrl(t, rel)}" alt="" /></a></div>`).join('') : ''
     const links = r ? [
-      ['snapshot.json', 'snapshot.json'],
-      ['meta.json', 'meta.json'],
-      ['dynamic.json', 'dynamic.json'],
-      ['dismissed.json', 'dismissed.json'],
-      ['assets-failed.json', 'assets-failed.json'],
+      ['snapshot.json', 'snapshot.json'], ['meta.json', 'meta.json'], ['dynamic.json', 'dynamic.json'],
+      ['dismissed.json', 'dismissed.json'], ['assets-failed.json', 'assets-failed.json'],
       ...r.viewports.map((w) => [`dom/${w}.json`, `dom/${w}.json`]),
     ].map(([label, rel]) => `<a href="${artifactUrl(t, rel)}" target="_blank">${esc(label)}</a>`).join('') : ''
-
-    const progress = t.progress.length
-      ? t.progress.map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')
-      : '（等待进度输出…）'
-
+    const progress = t.progress.length ? t.progress.map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n') : '(等待进度输出…)'
+    const canDelete = t.status === 'done' || t.status === 'failed'
     el.innerHTML = `
       <div class="detail">
         <div class="head">
-          <h3>${esc(t.input.source)}</h3>
-          <span class="id">${esc(t.id)}</span>
+          <h3>${esc(t.input.source)}</h3><span class="id">${esc(t.id)}</span>
+          ${canDelete ? '<button class="danger small" id="delete-task">删除任务</button>' : ''}
         </div>
-        <div class="grid">
-          ${cells.map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
-        </div>
+        <div class="grid">${cells.map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
         ${t.error ? `<div class="error">${esc(t.error)}</div>` : ''}
         <h2 style="padding:6px 0 8px">进度</h2>
         <div class="log" id="log">${progress}</div>
         ${shots ? `<h2 style="padding:18px 0 0">截图</h2><div class="shots">${shots}</div>` : ''}
         ${links ? `<div class="links">${links}</div>` : ''}
-        ${t.status === 'done' ? renderGenerations(t) : ''}
+        ${renderGenerations(t)}
         ${renderVerifications(t)}
       </div>`
     if (keepPath && $('#verify-path')) $('#verify-path').value = keepPath
-    wireGeneration(t)
-    wireVerification(t)
-    const log = $('#log')
-    if (log) log.scrollTop = log.scrollHeight
-  }
-
-  async function refresh() {
-    try {
-      const res = await apiFetch('/api/tasks')
-      if (res.status === 401) { banner('需要访问令牌：在右上角输入服务器启动时设置的 token'); return }
-      const data = await res.json()
-      state.tasks = data.tasks
-      if (!state.selected && state.tasks.length > 0) state.selected = state.tasks[0].id
-      $('#health').textContent = `队列 ${data.queue} · 任务 ${state.tasks.length}`
-      banner('')
-      renderTasks(); renderDetail()
-    } catch (err) {
-      banner('无法连接服务：' + err.message)
+    wireGeneration(t); wireVerification(t)
+    const del = $('#delete-task')
+    if (del) del.onclick = async () => {
+      if (!confirm('删除该任务及其全部产物?')) return
+      try {
+        const res = await api(`/api/tasks/${t.id}`, { method: 'DELETE' })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error || res.statusText)
+        state.tasks = state.tasks.filter((x) => x.id !== t.id)
+        state.selected = state.tasks[0]?.id ?? null
+        renderTasks(); renderDetail()
+      } catch (err) { banner('删除失败:' + err.message) }
     }
+    const log = $('#log'); if (log) log.scrollTop = log.scrollHeight
   }
 
-  $('#new-task').addEventListener('submit', async (ev) => {
-    ev.preventDefault()
-    const btn = $('#submit')
-    btn.disabled = true
+  // ---------- admin ----------
+
+  async function renderAdmin(el) {
+    el.innerHTML = '<p class="hint">加载管理数据…</p>'
     try {
-      const viewports = $('#viewports').value.split(',').map((s) => Number(s.trim())).filter(Boolean)
-      const body = {
-        type: $('#type').value,
-        source: $('#source').value.trim(),
-        options: {
-          viewports,
-          maxNodes: Number($('#maxNodes').value) || 4000,
-          dynamic: $('#dynamic').checked,
-          states: $('#states').checked,
-        },
+      const [users, blocks, audit, stats] = await Promise.all([
+        api('/api/admin/users').then((r) => r.json()),
+        api('/api/admin/blocks').then((r) => r.json()),
+        api('/api/admin/audit?limit=100').then((r) => r.json()),
+        api('/api/admin/stats').then((r) => r.json()),
+      ])
+      state.admin = { users: users.users, blocks: blocks.blocks, audit: audit.entries, stats }
+    } catch (err) { el.innerHTML = `<p class="hint">加载失败:${esc(err.message)}</p>`; return }
+
+    const { users, blocks, audit, stats } = state.admin
+    el.innerHTML = `
+      <div class="detail">
+        <div class="grid">
+          <div class="cell"><div class="k">用户</div><div class="v">${stats.users} ｜ 暂停 ${stats.suspended}</div></div>
+          <div class="cell"><div class="k">任务</div><div class="v">${stats.tasks}</div></div>
+          <div class="cell"><div class="k">存储</div><div class="v">${fmtBytes(stats.storageBytes)}</div></div>
+          <div class="cell"><div class="k">队列</div><div class="v">${stats.queue}</div></div>
+        </div>
+        <h2 style="padding:10px 0 8px">用户</h2>
+        <table class="admin"><thead><tr><th>邮箱</th><th>角色/状态</th><th>套餐</th><th>用量</th><th></th></tr></thead>
+        <tbody>${users.map((u) => `
+          <tr><td>${esc(u.email)}<div class="muted">${esc(u.id)}</div></td>
+            <td>${esc(u.role)} / ${esc(u.status)}</td>
+            <td>${esc(u.plan)}</td>
+            <td class="muted">任务 ${u.totals.tasks} ｜ 存储 ${fmtBytes(u.totals.storageBytes)}</td>
+            <td class="row">
+              <button class="ghost small" data-act="toggle" data-id="${u.id}">${u.status === 'suspended' ? '恢复' : '暂停'}</button>
+              <select class="small" data-act="plan" data-id="${u.id}" style="height:26px">
+                ${['free', 'pro', 'unlimited'].map((p) => `<option value="${p}" ${p === u.plan ? 'selected' : ''}>${p}</option>`).join('')}
+              </select>
+            </td></tr>`).join('')}</tbody></table>
+        <h2 style="padding:18px 0 8px">域名封禁</h2>
+        <div class="vform">
+          <input type="text" id="block-value" placeholder="example.com(含子域)" />
+          <button id="block-add">封禁</button>
+        </div>
+        <table class="admin"><tbody>${blocks.map((b) => `
+          <tr><td>${esc(b.kind)}: ${esc(b.value)}</td><td class="muted">${esc(b.note ?? '')}</td>
+          <td><button class="danger small" data-unblock="${b.id}">解除</button></td></tr>`).join('') || '<tr><td class="muted">暂无封禁</td></tr>'}</tbody></table>
+        <h2 style="padding:18px 0 8px">审计日志</h2>
+        <table class="admin"><thead><tr><th>时间</th><th>操作</th><th>对象</th></tr></thead>
+        <tbody>${audit.map((a) => `<tr><td class="muted">${fmtTime(a.at)}</td><td>${esc(a.action)}</td><td class="muted">${esc(a.actor_id ?? '-')}</td></tr>`).join('')}</tbody></table>
+      </div>`
+
+    for (const btn of el.querySelectorAll('[data-act]')) {
+      if (btn.dataset.act === 'toggle') btn.onclick = async () => {
+        const user = state.admin.users.find((u) => u.id === btn.dataset.id)
+        const status = user.status === 'suspended' ? 'active' : 'suspended'
+        const res = await api(`/api/admin/users/${user.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status }) })
+        if (!res.ok) banner('操作失败:' + ((await res.json()).error || res.statusText))
+        renderAdmin(el)
       }
-      const res = await apiFetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || res.statusText)
-      upsert(data.task); state.selected = data.task.id
-      renderTasks(); renderDetail()
-    } catch (err) {
-      alert('创建任务失败：' + err.message)
-    } finally {
-      btn.disabled = false
     }
-  })
+    for (const sel of el.querySelectorAll('select[data-act=plan]')) {
+      sel.onchange = async () => {
+        const res = await api(`/api/admin/users/${sel.dataset.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: sel.value }) })
+        if (!res.ok) banner('操作失败:' + ((await res.json()).error || res.statusText))
+        renderAdmin(el)
+      }
+    }
+    for (const btn of el.querySelectorAll('[data-unblock]')) {
+      btn.onclick = async () => {
+        await api(`/api/admin/blocks/${btn.dataset.unblock}`, { method: 'DELETE' })
+        renderAdmin(el)
+      }
+    }
+    $('#block-add').onclick = async () => {
+      const value = $('#block-value').value.trim()
+      if (!value) return
+      const res = await api('/api/admin/blocks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'domain', value }) })
+      if (!res.ok) banner('封禁失败:' + ((await res.json()).error || res.statusText))
+      renderAdmin(el)
+    }
+  }
+
+  // ---------- boot ----------
+
+  async function loadTasks() {
+    const res = await api('/api/tasks')
+    if (res.status === 401) return false
+    const data = await res.json()
+    state.tasks = data.tasks
+    if (!state.selected || !state.tasks.some((t) => t.id === state.selected)) state.selected = state.tasks[0]?.id ?? null
+    $('#health').textContent = `队列 ${data.queue} · 任务 ${state.tasks.length}`
+    return true
+  }
+
+  async function boot() {
+    const meRes = await api('/api/auth/me')
+    if (meRes.status === 401) { state.me = null; renderAuth(); return }
+    const me = await meRes.json()
+    state.me = me
+    $('#whoami').textContent = `${me.user.email} · ${me.user.plan}${me.user.role === 'admin' ? ' · admin' : ''}`
+    $('#logout').style.display = 'inline-block'
+    $('#tab-admin').style.display = me.user.role === 'admin' ? 'inline-block' : 'none'
+    $('#logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); await boot() }
+    banner('')
+    await loadTasks()
+    renderSidebar()
+    renderDetail()
+  }
+
+  $('#tab-tasks').onclick = () => { state.view = 'tasks'; $('#tab-tasks').classList.add('active'); $('#tab-admin').classList.remove('active'); renderDetail() }
+  $('#tab-admin').onclick = () => { state.view = 'admin'; $('#tab-admin').classList.add('active'); $('#tab-tasks').classList.remove('active'); renderDetail() }
 
   const events = new EventSource('/api/events' + (tokenStore.get() ? '?token=' + encodeURIComponent(tokenStore.get()) : ''))
   events.addEventListener('task', (ev) => {
     const task = JSON.parse(ev.data)
     upsert(task)
-    if (state.selected === task.id) renderDetail()
+    if (state.view === 'tasks' && state.selected === task.id) renderDetail()
     renderTasks()
-    apiFetch('/api/health').then((r) => { if (r.ok) return r.json(); return null }).then((h) => { if (h) $('#health').textContent = `队列 ${h.queue} · 任务 ${h.tasks}` }).catch(() => {})
   })
+  events.addEventListener('cleaned', () => { void loadTasks().then(() => { renderTasks(); renderDetail() }) })
 
-  $('#token').value = tokenStore.get()
-  $('#token-save').onclick = () => {
-    tokenStore.set($('#token').value.trim())
-    location.reload()
-  }
-
-  refresh()
+  $('#tab-tasks').classList.add('active')
+  void boot().catch((err) => banner('无法连接服务:' + err.message))
 </script>
 </body>
 </html>

@@ -1,12 +1,16 @@
-# @copypage/server — 捕获与验证服务
+# @copypage/server — 捕获与验证服务(多租户)
 
-把 CopyPage 工具链封装成 HTTP 服务：提交 URL/图片/视频 → 后台串行捕获 → 提交还原工程验证（构建 + 探测 + 差异 + 报告 + 收敛判定），全程 SSE 实时进度。
+把 CopyPage 工具链封装成 HTTP 服务：提交 URL/图片/视频 → 后台 worker 进程捕获 → 提交还原工程验证（构建 + 探测 + 差异 + 报告 + 收敛判定）或让 agent 自动生成，全程 SSE 实时进度。支持单租户与多租户（账号、配额、审核、管理后台）两种形态。
 
 ## 运行
 
 ```bash
 npm run serve                                  # http://127.0.0.1:4400，数据在 work/server
-npx tsx packages/server/src/cli.ts --port 4400 --data-dir work/server
+# 公开多租户模式
+npx tsx packages/server/src/cli.ts --host 0.0.0.0 \
+  --token "$COPYPAGE_TOKEN" --allow-registration \
+  --admin-email you@example.com --admin-password '...' \
+  --worker-concurrency 4
 ```
 
 ### 启动参数
@@ -25,8 +29,12 @@ npx tsx packages/server/src/cli.ts --port 4400 --data-dir work/server
 | `--max-tasks` | 50 | 任务数上限,超出返回 507 |
 | `--max-upload-mb` | 200 | zip 上传大小上限 |
 | `--retention-hours` | 168 | 完成任务的保留时长,过期自动删除 |
-| `--rate-limit-per-minute` | 120 | 每 IP 每分钟 /api 请求上限(0 关闭) |
+| `--rate-limit-per-minute` | 120 | 每调用方每分钟 /api 请求上限(登录后按用户,否则按 IP;0 关闭) |
 | `--trust-proxy` | 关 | 信任 `X-Forwarded-For`(仅当所有请求都经反代) |
+| `--allow-registration` | **关** | 开放自助注册(公开模式) |
+| `--admin-email` / `--admin-password` | 无 | 首次启动创建引导管理员 |
+| `--worker-concurrency` | 2 | 全局并行任务数(每个任务一个 worker 进程) |
+| `--worker-memory-mb` | 3072 | worker 进程 V8 堆上限 |
 
 环境变量同名:`COPYPAGE_TOKEN`、`COPYPAGE_ALLOW_BUILD`、`COPYPAGE_ALLOW_PRIVATE_NETWORK`、`COPYPAGE_ALLOW_AGENT`、`COPYPAGE_AGENT_COMMAND`、`COPYPAGE_AGENT_MODEL`、`COPYPAGE_AGENT_MAX_ROUNDS`、`COPYPAGE_AGENT_TIMEOUT_MIN`、`COPYPAGE_MAX_TASKS`、`COPYPAGE_MAX_UPLOAD_MB`、`COPYPAGE_RETENTION_HOURS`、`COPYPAGE_RATE_LIMIT_PER_MINUTE`、`COPYPAGE_TRUST_PROXY`、`COPYPAGE_CHROMIUM_ARGS`。
 
@@ -90,7 +98,49 @@ decide(loop, metrics)           # pass / continue / escalate / stagnant-stop / c
 - `loop` 随每次验证推进：`history` 追加指标，`escalate` 一旦触发保持
 - 构建失败（`BuildError`）会记录完整构建输出，验证状态置为 failed
 
-## 自动生成(Phase 3)
+## 多租户
+
+| 能力 | 说明 |
+|---|---|
+| 账号 | 邮箱 + 密码(scrypt);会话 cookie(HttpOnly/SameSite)或 API 令牌(`cp_…`,仅存哈希) |
+| 角色 | `user` / `admin`;引导管理员首次启动自动创建 |
+| 隔离 | 任务、产物、SSE 均按 owner 过滤;跨租户读写返回 404;服务器本地路径验证仅限管理员 |
+| 配额 | 套餐(`free`/`pro`/`unlimited`)限制任务数/存储/每日捕获·验证·生成次数/并发;超限 403 + `code`/`quota`/`usage` |
+| 审核 | 域名封禁(含子域)在捕获入口拦截;用户暂停即全站 403 |
+| 审计 | 注册、登录、令牌、封禁、配额、删除写入 `audit_log` |
+
+状态存 SQLite(`node:sqlite`,`dataDir/copypage.db`,WAL),产物仍在 `dataDir/tasks/<id>/`。
+
+### 认证与管理接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/auth/register` / `/api/auth/login` / `/api/auth/logout` | 注册/登录/退出 |
+| `GET` | `/api/auth/me` | 身份 + 配额 + 用量 |
+| `GET/POST` | `/api/tokens` · `DELETE /api/tokens/:id` | API 令牌 |
+| `GET/PATCH` | `/api/admin/users(/:id)` | 用户列表 / 改状态·套餐·配额·密码 |
+| `GET/POST/DELETE` | `/api/admin/blocks(/:id)` | 域名封禁 |
+| `GET` | `/api/admin/audit` / `/api/admin/stats` | 审计 / 统计 |
+
+默认套餐:free 10 任务/500MB/每日 1 次生成;pro 200/20GB/20;unlimited 不限制。可按用户覆盖单项配额。
+
+## 任务执行(worker 进程隔离)
+
+```
+API 进程 ──enqueue──▶ 队列(全局并发 + 每租户并发)
+                         │ spawn tsx worker.ts(独立进程,NODE_OPTIONS 堆上限)
+                         ▼
+              jobs.ts: capture / verify / generate
+                         │ JSONL 事件(stdout):进展 · 验证 · 循环 · 结果
+                         ▼
+              调度器写入 SQLite → SSE 推送
+```
+
+- 每任务一个 worker 进程:崩溃不影响 API,内存有上限,超时 SIGTERM→SIGKILL
+- worker 不碰数据库,状态统一由调度器落库;重启后一致
+- 容器化隔离(每租户独立容器/网络)只需把 `queue.ts` 的 spawn 换成 `docker run`,接口不变
+
+## 自动生成
 
 ```bash
 curl -X POST localhost:4400/api/tasks/<taskId>/generate
