@@ -5,7 +5,7 @@ import { resolveConfig, type ServerConfig } from './config.js'
 import { Db } from './db.js'
 import { CaptureQueue } from './queue.js'
 import { resolveQuotaForOwner } from './quotas.js'
-import { TaskStore } from './store.js'
+import { importLegacyTasks, TaskStore } from './store.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -29,6 +29,8 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
   const repoRoot = path.resolve(here, '../../..')
 
   const db = new Db(dataDir)
+  const imported = await importLegacyTasks(dataDir, db)
+  if (imported > 0) console.log(`[migrate] imported ${imported} task(s) from the pre-SQLite file store`)
   const store = new TaskStore(dataDir, db)
   const queue = new CaptureQueue({
     store,

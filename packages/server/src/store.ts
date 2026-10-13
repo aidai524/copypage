@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import type { Db, TaskRow } from './db.js'
 import type {
@@ -10,6 +10,46 @@ import type {
   TaskStatus,
   Verification,
 } from './types.js'
+
+/**
+ * One-time import of task.json files written by the pre-SQLite file store.
+ * Idempotent: existing ids are skipped. Legacy tasks belong to the operator
+ * (`system`) so single-user deployments keep their history after upgrading.
+ */
+export async function importLegacyTasks(dataDir: string, db: Db): Promise<number> {
+  const tasksRoot = path.join(dataDir, 'tasks')
+  const entries = await readdir(tasksRoot, { withFileTypes: true }).catch(() => [])
+  let imported = 0
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    if (db.getTask(entry.name)) continue
+    const file = path.join(tasksRoot, entry.name, 'task.json')
+    const legacy = await readFile(file, 'utf8')
+      .then((raw) => JSON.parse(raw) as Partial<Task>)
+      .catch(() => null)
+    if (!legacy?.id || !legacy.input) continue
+    const now = new Date().toISOString()
+    db.insertTask({
+      id: legacy.id,
+      owner_id: legacy.ownerId ?? 'system',
+      status: legacy.status ?? 'done',
+      input_json: JSON.stringify(legacy.input),
+      options_json: JSON.stringify(legacy.options ?? {}),
+      progress_json: JSON.stringify(legacy.progress ?? []),
+      loop_json: JSON.stringify(legacy.loop ?? { round: 0, history: [], escalated: false }),
+      verifications_json: JSON.stringify(legacy.verifications ?? []),
+      generations_json: JSON.stringify(legacy.generations ?? []),
+      result_json: legacy.result ? JSON.stringify(legacy.result) : null,
+      worker_json: '{}',
+      size_bytes: legacy.sizeBytes ?? 0,
+      error: legacy.error ?? null,
+      created_at: legacy.createdAt ?? now,
+      updated_at: legacy.updatedAt ?? now,
+    })
+    imported++
+  }
+  return imported
+}
 
 export function newTaskId(): string {
   const t = new Date()
