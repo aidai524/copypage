@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url'
 import { createApiServer } from './api.js'
 import { resolveConfig, type ServerConfig } from './config.js'
 import { Db } from './db.js'
+import { startAlertRunner } from './alerts.js'
 import { alertEmail, createEmailClient, type EmailClient } from './email.js'
+import { Metrics } from './metrics.js'
+import { assertDockerAvailable } from './sandbox.js'
 import { warnUser } from './warnings.js'
 import { CaptureQueue } from './queue.js'
 import { resolveQuotaForOwner } from './quotas.js'
@@ -34,6 +37,11 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
   const repoRoot = path.resolve(here, '../../..')
 
   const failureWindows = new Map<string, { count: number; resetAt: number }>()
+  const metrics = new Metrics()
+  if (config.sandbox === 'docker') {
+    const version = await assertDockerAvailable()
+    console.log(`[sandbox] docker ${version} · image ${config.workerImage} · network ${config.workerNetwork}`)
+  }
   const db = new Db(dataDir)
   const imported = await importLegacyTasks(dataDir, db)
   if (imported > 0) console.log(`[migrate] imported ${imported} task(s) from the pre-SQLite file store`)
@@ -52,6 +60,18 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
       timeoutMs: config.agentTimeoutMs,
       ...(config.agentModel ? { model: config.agentModel } : {}),
     },
+    metrics,
+    ...(config.sandbox === 'docker'
+      ? {
+          sandbox: {
+            image: config.workerImage,
+            network: config.workerNetwork,
+            memoryMb: config.workerMemoryMb,
+            cpus: config.workerCpus,
+            pidsLimit: config.workerPidsLimit,
+          },
+        }
+      : {}),
     quotaForOwner: (ownerId) => resolveQuotaForOwner(db, ownerId, config),
     onJobFailed: ({ ownerId, kind, taskId, error }) => {
       if (ownerId === 'system') return
@@ -80,7 +100,7 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
   const authRequired = () =>
     Boolean(config.token) || Boolean(config.adminEmail) || db.countUsers() > 0
 
-  const server = createApiServer({ store, queue, db, config, publicDir, authRequired, email })
+  const server = createApiServer({ store, queue, db, config, publicDir, authRequired, email, metrics })
 
   await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve))
   const addr = server.address()
@@ -95,6 +115,40 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
   const timer = setInterval(sweep, config.cleanupIntervalMs)
   timer.unref()
 
+  // gauge refresh (queue depth, task states, users, storage)
+  const gaugeTimer = setInterval(() => {
+    const tasks = store.list()
+    metrics.gauge('copypage_queue_depth', queue.size, 'queued + running jobs')
+    for (const status of ['queued', 'running', 'done', 'failed']) {
+      metrics.gauge(`copypage_tasks_${status}`, tasks.filter((t) => t.status === status).length)
+    }
+    metrics.gauge('copypage_users_total', db.countUsers())
+    metrics.gauge('copypage_storage_bytes', db.sumStorage())
+    metrics.gauge('copypage_warnings_total', db.listWarnings(undefined, 1000).length)
+  }, 30_000)
+  gaugeTimer.unref()
+
+  // operator alerts (queue backlog, failure rate, disk pressure)
+  const alertRunner = startAlertRunner({
+    db,
+    store,
+    metrics,
+    config,
+    email,
+    recentJobs: () => queue.recentJobs(),
+    diskUsedPct: async () => {
+      const { statfs } = await import('node:fs/promises')
+      try {
+        const stats = await statfs(dataDir)
+        const total = stats.blocks * stats.bsize
+        const free = stats.bavail * stats.bsize
+        return total > 0 ? ((total - free) / total) * 100 : 0
+      } catch {
+        return 0
+      }
+    },
+  })
+
   return {
     url: `http://${config.host}:${port}`,
     port,
@@ -105,6 +159,8 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
     close: () =>
       new Promise<void>((resolve, reject) => {
         clearInterval(timer)
+        clearInterval(gaugeTimer)
+        alertRunner.stop()
         server.close((err) => {
           if (err) {
             reject(err)
@@ -125,4 +181,8 @@ export { assertPublicUrl, isPrivateAddress, SecurityError } from './security.js'
 export { checkQuota, resolveQuota, resolveQuotaForOwner, quotaUsage } from './quotas.js'
 export { authenticate, hashPassword, verifyPassword } from './auth.js'
 export { createEmailClient } from './email.js'
+export { Metrics } from './metrics.js'
+export { evaluateAlerts, startAlertRunner } from './alerts.js'
+export { buildDockerArgs, mapSpecPaths, assertDockerAvailable } from './sandbox.js'
+export type { AlertEvent, AlertState } from './alerts.js'
 export type { EmailClient, EmailMessage } from './email.js'

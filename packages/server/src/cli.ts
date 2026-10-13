@@ -30,6 +30,10 @@ const adminEmail = arg('admin-email')
 const adminPassword = arg('admin-password')
 const workerConcurrency = Number(arg('worker-concurrency', '2'))
 const workerMemoryMb = Number(arg('worker-memory-mb', '3072'))
+const sandbox = arg('sandbox', 'process') === 'docker' ? 'docker' : 'process'
+const workerImage = arg('worker-image', 'copypage-server:local')!
+const workerNetwork = arg('worker-network', 'bridge')!
+const workerCpus = Number(arg('worker-cpus', '1'))
 
 const server = await startServer({
   port,
@@ -49,6 +53,10 @@ const server = await startServer({
   allowRegistration,
   workerConcurrency,
   workerMemoryMb,
+  sandbox,
+  workerImage,
+  workerNetwork,
+  workerCpus,
   ...(adminEmail ? { adminEmail } : {}),
   ...(adminPassword ? { adminPassword } : {}),
   ...(token ? { token } : {}),
@@ -60,7 +68,7 @@ console.log(`  data dir: ${dataDir}`)
 console.log(`  auth: ${token ? 'bearer token required' : 'OPEN (loopback only)'}`)
 console.log(`  retention: ${retentionHours}h · max tasks: ${maxTasks} · max upload: ${maxUploadMb}MB`)
 console.log(
-  `  workers: ${workerConcurrency} × ${workerMemoryMb}MB · registration: ${allowRegistration ? 'open' : 'closed'}` +
+  `  workers: ${workerConcurrency} × ${workerMemoryMb}MB (${sandbox}) · registration: ${allowRegistration ? 'open' : 'closed'}` +
     (adminEmail ? ` · admin: ${adminEmail}` : ''),
 )
 if (allowBuild) console.log('  ⚠ --allow-build: submitted projects run `npm run build` (arbitrary code execution)')

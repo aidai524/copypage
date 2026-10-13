@@ -22,6 +22,7 @@ import type { ServerConfig } from './config.js'
 import type { BlockRow, Db, UserRow } from './db.js'
 import { alertEmail, resetEmail, verificationEmail, warningEmail, type EmailClient } from './email.js'
 import { maybeQuotaWarning, warnUser, type WarningKind } from './warnings.js'
+import type { Metrics } from './metrics.js'
 import type { CaptureQueue } from './queue.js'
 import { extractReproZip, ReproError } from './repro.js'
 import { assertPublicUrl, SecurityError } from './security.js'
@@ -128,9 +129,10 @@ export interface ApiDeps {
   authRequired: () => boolean
   /** mail transport (Resend when configured, stdout otherwise) */
   email: EmailClient
+  metrics: Metrics
 }
 
-export function createApiServer({ store, queue, db, config, publicDir, authRequired, email }: ApiDeps) {
+export function createApiServer({ store, queue, db, config, publicDir, authRequired, email, metrics }: ApiDeps) {
   // bootstrap admin so the first login works
   ensureBootstrapAdmin(db, config)
 
@@ -163,12 +165,43 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     return true
   }
 
+  /** collapse ids so metric labels stay low-cardinality */
+  function normalizeRoute(pathname: string): string {
+    return pathname
+      .replace(/^\/api\/tasks\/[^/]+/, '/api/tasks/:id')
+      .replace(/^\/api\/admin\/users\/[^/]+/, '/api/admin/users/:id')
+      .replace(/^\/api\/admin\/blocks\/[^/]+/, '/api/admin/blocks/:id')
+      .replace(/^\/api\/admin\/warnings\/[^/]+/, '/api/admin/warnings/:id')
+      .replace(/^\/api\/tokens\/[^/]+/, '/api/tokens/:id')
+      .replace(/^\/api\/warnings\/[^/]+/, '/api/warnings/:id')
+  }
+
   const server = createServer((req, res) => {
     const started = Date.now()
     res.on('finish', () => {
       // never log query strings: they may carry ?token=
       const pathOnly = (req.url ?? '/').split('?')[0]
-      console.log(`[http] ${req.method} ${pathOnly} → ${res.statusCode} (${Date.now() - started}ms)`)
+      const durationMs = Date.now() - started
+      metrics.inc('copypage_http_requests_total', {
+        method: req.method ?? 'GET',
+        route: normalizeRoute(pathOnly),
+        status: res.statusCode,
+      })
+      metrics.observe('copypage_http_request_duration_seconds', durationMs / 1000)
+      if (config.logFormat === 'json') {
+        console.log(
+          JSON.stringify({
+            ts: new Date().toISOString(),
+            method: req.method,
+            path: pathOnly,
+            status: res.statusCode,
+            durationMs,
+            ip: clientIp(req),
+          }),
+        )
+      } else {
+        console.log(`[http] ${req.method} ${pathOnly} → ${res.statusCode} (${durationMs}ms)`)
+      }
     })
     void handle(req, res).catch((err) => {
       json(res, 500, { error: err instanceof Error ? err.message : String(err) })
@@ -281,6 +314,20 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       const html = await readFile(path.join(publicDir, 'index.html'), 'utf8')
       res.writeHead(200, { 'content-type': MIME['.html'] })
       res.end(html)
+      return
+    }
+
+    // Prometheus scrape endpoint: loopback always allowed, others need admin
+    if (pathname === '/metrics' && req.method === 'GET') {
+      const remote = (req.socket.remoteAddress ?? '').replace('::ffff:', '')
+      const loopback = remote === '127.0.0.1' || remote === '::1'
+      const scrapeIdentity = authenticate(req, db, config)
+      if (!config.metricsOpen && !loopback && scrapeIdentity?.role !== 'admin') {
+        json(res, 401, { error: 'unauthorized' })
+        return
+      }
+      res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8' })
+      res.end(metrics.render())
       return
     }
 

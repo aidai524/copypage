@@ -134,7 +134,40 @@ COPYPAGE_WORKER_MEMORY_MB=3072       # 单 worker 堆上限
 - `copypage.db`(SQLite,在数据卷内)与任务产物一起备份;保留时长由 `COPYPAGE_RETENTION_HOURS` 控制
 - 生成功能成本高:保持 `COPYPAGE_ALLOW_AGENT=false`,或在 free 套餐把「今日生成」设为 0/1
 
-## 6. 公网暴露前
+## 6. 邮件(Resend)、监控、沙箱
+
+**邮件**:注册验证 / 找回密码 / 用户提醒 / 运维告警都走 Resend:
+
+```ini
+COPYPAGE_RESEND_API_KEY=re_xxx
+COPYPAGE_EMAIL_FROM=CopyPage <no-reply@your-domain>
+COPYPAGE_APP_URL=https://your-domain        # 邮件里的链接基址
+COPYPAGE_REQUIRE_EMAIL_VERIFICATION=true    # 未验证邮箱不能提交任务
+COPYPAGE_ADMIN_ALERT_EMAIL=ops@your-domain  # 告警收件人
+```
+
+未配置 key 时邮件只打印到日志(本地开发可用)。
+
+**监控**:`GET /metrics` 输出 Prometheus 文本(HTTP/任务/队列/存储/告警计数;loopback 免鉴权,外部需管理员令牌或 `COPYPAGE_METRICS_OPEN=true`):
+
+```yaml
+scrape_configs:
+  - job_name: copypage
+    static_configs: [{ targets: ['copypage-host:4400'] }]
+```
+
+内置告警规则(每 60s 评估,30 分钟内去重,写审计并邮件通知):队列积压 ≥10、近窗口失败率 ≥50%(样本 ≥5)、磁盘 ≥85%。`COPYPAGE_LOG_FORMAT=json` 可直接对接日志采集。
+
+**容器沙箱**:`COPYPAGE_SANDBOX=docker` 后每个任务在独立容器里执行(内存/CPU/pids 限制、只读 /app、可写 /data、独立网络),API 进程被击穿不影响宿主:
+
+```bash
+docker build -t copypage-server:local -f deploy/Dockerfile .
+COPYPAGE_SANDBOX=docker COPYPAGE_WORKER_IMAGE=copypage-server:local npm run serve
+```
+
+> ⚠ 该模式要求进程能访问 Docker(通常需要 `docker` 组)。**在 compose 里跑会需要挂载 `/var/run/docker.sock`,等于把宿主 root 权限交出去** —— 推荐 systemd 方式部署,或把 worker 放到独立主机。
+
+## 7. 公网暴露前
 
 - `SITE_ADDRESS=你的域名`,发布 443;Caddy 会自动申请证书
 - 确认 `COPYPAGE_TOKEN` 为强随机值、必要时轮换

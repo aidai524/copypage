@@ -48,6 +48,20 @@ export interface ServerConfig {
   requireEmailVerification: boolean
   /** admin notification address for abuse/alert emails (optional) */
   adminAlertEmail?: string
+  /** job isolation backend */
+  sandbox: 'process' | 'docker'
+  /** docker image used for worker jobs (built from deploy/Dockerfile) */
+  workerImage: string
+  /** docker network for worker containers */
+  workerNetwork: string
+  /** cpu limit per worker container */
+  workerCpus: number
+  /** process limit per worker container */
+  workerPidsLimit: number
+  /** request log format */
+  logFormat: 'text' | 'json'
+  /** expose GET /metrics without auth (loopback is always allowed) */
+  metricsOpen: boolean
   /** hard cap on stored tasks; new captures are rejected above it */
   maxTasks: number
   /** max upload size for repro zips */
@@ -156,6 +170,13 @@ export function resolveConfig(partial: Partial<ServerConfig> = {}): ServerConfig
     ...(partial.adminAlertEmail ?? process.env.COPYPAGE_ADMIN_ALERT_EMAIL
       ? { adminAlertEmail: partial.adminAlertEmail ?? process.env.COPYPAGE_ADMIN_ALERT_EMAIL }
       : {}),
+    sandbox: partial.sandbox ?? (process.env.COPYPAGE_SANDBOX === 'docker' ? 'docker' : 'process'),
+    workerImage: partial.workerImage ?? process.env.COPYPAGE_WORKER_IMAGE ?? 'copypage-server:local',
+    workerNetwork: partial.workerNetwork ?? process.env.COPYPAGE_WORKER_NETWORK ?? 'bridge',
+    workerCpus: partial.workerCpus ?? Number(process.env.COPYPAGE_WORKER_CPUS ?? '1'),
+    workerPidsLimit: partial.workerPidsLimit ?? Number(process.env.COPYPAGE_WORKER_PIDS_LIMIT ?? '256'),
+    logFormat: partial.logFormat ?? (process.env.COPYPAGE_LOG_FORMAT === 'json' ? 'json' : 'text'),
+    metricsOpen: partial.metricsOpen ?? envBool('COPYPAGE_METRICS_OPEN', false),
     ...(partial.adminEmail ?? process.env.COPYPAGE_ADMIN_EMAIL
       ? { adminEmail: partial.adminEmail ?? process.env.COPYPAGE_ADMIN_EMAIL }
       : {}),

@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import path from 'node:path'
 import type { Quota } from './config.js'
+import type { Metrics } from './metrics.js'
+import { buildDockerArgs, mapSpecPaths, type SandboxOptions } from './sandbox.js'
 import {
   directorySize,
   type CaptureJobSpec,
@@ -40,6 +42,10 @@ export interface CaptureQueueOptions {
   }
   /** per-tenant concurrency guard (the API also checks quotas at enqueue) */
   quotaForOwner?: (ownerId: string) => Quota
+  /** metrics registry (optional) */
+  metrics?: Metrics
+  /** container isolation; when set, jobs run via `docker run` */
+  sandbox?: Omit<SandboxOptions, 'dataDir' | 'repoRoot'>
   /** failure signal for abuse/quality warnings (never throws back) */
   onJobFailed?: (info: {
     taskId: string
@@ -72,6 +78,10 @@ export class CaptureQueue {
   private agent: NonNullable<CaptureQueueOptions['agent']>
   private quotaForOwner: ((ownerId: string) => Quota) | undefined
   private onJobFailed: CaptureQueueOptions['onJobFailed']
+  private metrics: Metrics | undefined
+  private sandbox: Omit<SandboxOptions, 'dataDir' | 'repoRoot'> | undefined
+  /** rolling job outcomes for alert rules (last 15 min) */
+  private outcomes: { at: number; ok: boolean }[] = []
 
   constructor(opts: CaptureQueueOptions) {
     if (!opts.store) throw new Error('CaptureQueue requires a store')
@@ -85,6 +95,25 @@ export class CaptureQueue {
     this.agent = opts.agent ?? {}
     this.quotaForOwner = opts.quotaForOwner
     this.onJobFailed = opts.onJobFailed
+    this.metrics = opts.metrics
+    this.sandbox = opts.sandbox
+  }
+
+  /** started/failed counts inside the rolling window (default 15 min) */
+  recentJobs(windowMs = 15 * 60_000): { started: number; failed: number } {
+    const cutoff = Date.now() - windowMs
+    this.outcomes = this.outcomes.filter((o) => o.at >= cutoff)
+    return {
+      started: this.outcomes.length,
+      failed: this.outcomes.filter((o) => !o.ok).length,
+    }
+  }
+
+  private recordOutcome(kind: QueueJob['kind'], startedAt: number, ok: boolean): void {
+    this.outcomes.push({ at: Date.now(), ok })
+    if (this.outcomes.length > 500) this.outcomes.splice(0, this.outcomes.length - 500)
+    this.metrics?.inc('copypage_jobs_total', { kind, result: ok ? 'done' : 'failed' })
+    this.metrics?.observe('copypage_job_duration_seconds', (Date.now() - startedAt) / 1000, 'job duration')
   }
 
   private notifyFailure(job: QueueJob, error: string): void {
@@ -131,9 +160,17 @@ export class CaptureQueue {
   }
 
   private async runJob(job: QueueJob): Promise<void> {
-    if (job.kind === 'capture') return this.runCapture(job)
-    if (job.kind === 'verify') return this.runVerify(job)
-    return this.runGenerate(job)
+    const started = Date.now()
+    this.metrics?.inc('copypage_jobs_started_total', { kind: job.kind })
+    try {
+      if (job.kind === 'capture') await this.runCapture(job)
+      else if (job.kind === 'verify') await this.runVerify(job)
+      else await this.runGenerate(job)
+      this.recordOutcome(job.kind, started, true)
+    } catch (err) {
+      this.recordOutcome(job.kind, started, false)
+      throw err
+    }
   }
 
   // ---------- capture ----------
@@ -164,6 +201,7 @@ export class CaptureQueue {
       await this.refreshSize(task.id)
     } catch (err) {
       await this.fail(job, err)
+      this.recordOutcome(job.kind, Date.now(), false)
     }
   }
 
@@ -217,6 +255,7 @@ export class CaptureQueue {
         // task/verification gone
       }
       this.notifyFailure(job, message)
+      this.recordOutcome(job.kind, Date.now(), false)
     }
   }
 
@@ -290,6 +329,7 @@ export class CaptureQueue {
         // task/generation gone
       }
       this.notifyFailure(job, message)
+      this.recordOutcome(job.kind, Date.now(), false)
     }
   }
 
@@ -323,8 +363,23 @@ export class CaptureQueue {
     timeoutMs: number,
     onEvent: (event: WorkerEvent) => Promise<void> | void,
   ): Promise<void> {
+    // docker backend: same worker entrypoint, but inside its own container
+    // with /data + read-only /app mounts and host paths rewritten
+    const sandbox = this.sandbox
+    const command = sandbox
+      ? {
+          cmd: 'docker',
+          args: buildDockerArgs(mapSpecPaths(spec, { dataDir: this.store.dataDir, repoRoot: this.repoRoot }), {
+            ...sandbox,
+            dataDir: this.store.dataDir,
+            repoRoot: this.repoRoot,
+          }),
+          payload: mapSpecPaths(spec, { dataDir: this.store.dataDir, repoRoot: this.repoRoot }),
+        }
+      : { cmd: this.tsxPath, args: [this.workerPath], payload: spec }
+
     return new Promise<void>((resolve, reject) => {
-      const child = spawn(this.tsxPath, [this.workerPath], {
+      const child = spawn(command.cmd, command.args, {
         cwd: this.repoRoot,
         env: {
           ...process.env,
@@ -398,7 +453,7 @@ export class CaptureQueue {
         finish(() => reject(new Error(`worker exited ${code}${detail ? `: ${detail}` : ''}`)))
       })
 
-      child.stdin!.end(JSON.stringify(spec))
+      child.stdin!.end(JSON.stringify(command.payload))
     })
   }
 }
