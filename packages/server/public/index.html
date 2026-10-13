@@ -142,6 +142,22 @@
   const fmtBytes = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n > 1024 ? (n / 1024).toFixed(0) + ' KB' : (n || 0) + ' B')
   const fmtDuration = (ms) => (ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms')
   function banner(msg) { const el = $('#banner'); el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none' }
+  function renderWarnings() {
+    const el = $('#banner')
+    const warnings = (state.me?.warnings ?? []).filter((w) => !w.acknowledged)
+    if (warnings.length === 0) { banner(''); return }
+    const w = warnings[0]
+    el.innerHTML = `<span>⚠ ${esc(w.message)}</span>
+      <button class="ghost small" id="ack-warning" style="margin-left:12px">知道了</button>
+      ${warnings.length > 1 ? `<span class="muted" style="margin-left:8px">还有 ${warnings.length - 1} 条</span>` : ''}`
+    el.style.display = 'flex'
+    el.style.gap = '8px'
+    el.style.alignItems = 'center'
+    $('#ack-warning').onclick = async () => {
+      await api(`/api/warnings/${w.id}/ack`, { method: 'POST' })
+      await boot()
+    }
+  }
   function upsert(task) { const i = state.tasks.findIndex((t) => t.id === task.id); if (i >= 0) state.tasks[i] = task; else state.tasks.unshift(task) }
 
   // ---------- auth ----------
@@ -452,16 +468,17 @@
   async function renderAdmin(el) {
     el.innerHTML = '<p class="hint">加载管理数据…</p>'
     try {
-      const [users, blocks, audit, stats] = await Promise.all([
+      const [users, blocks, audit, stats, warnings] = await Promise.all([
         api('/api/admin/users').then((r) => r.json()),
         api('/api/admin/blocks').then((r) => r.json()),
         api('/api/admin/audit?limit=100').then((r) => r.json()),
         api('/api/admin/stats').then((r) => r.json()),
+        api('/api/admin/warnings').then((r) => r.json()),
       ])
-      state.admin = { users: users.users, blocks: blocks.blocks, audit: audit.entries, stats }
+      state.admin = { users: users.users, blocks: blocks.blocks, audit: audit.entries, stats, warnings: warnings.warnings }
     } catch (err) { el.innerHTML = `<p class="hint">加载失败:${esc(err.message)}</p>`; return }
 
-    const { users, blocks, audit, stats } = state.admin
+    const { users, blocks, audit, stats, warnings } = state.admin
     el.innerHTML = `
       <div class="detail">
         <div class="grid">
@@ -491,6 +508,20 @@
         <table class="admin"><tbody>${blocks.map((b) => `
           <tr><td>${esc(b.kind)}: ${esc(b.value)}</td><td class="muted">${esc(b.note ?? '')}</td>
           <td><button class="danger small" data-unblock="${b.id}">解除</button></td></tr>`).join('') || '<tr><td class="muted">暂无封禁</td></tr>'}</tbody></table>
+        <h2 style="padding:18px 0 8px">预警提示</h2>
+        <div class="vform">
+          <select id="warn-user" style="flex:1">${users.map((u) => `<option value="${u.id}">${esc(u.email)}</option>`).join('')}</select>
+          <input type="text" id="warn-message" placeholder="给该用户发送提醒(会显示在其界面,并发送邮件)" />
+          <button id="warn-send">发送提醒</button>
+        </div>
+        <table class="admin"><thead><tr><th>时间</th><th>用户</th><th>类型</th><th>内容</th><th></th></tr></thead>
+        <tbody>${(warnings ?? []).map((w) => `
+          <tr><td class="muted">${fmtTime(w.created_at)}</td>
+              <td class="muted">${esc(users.find((u) => u.id === w.user_id)?.email ?? w.user_id ?? '-')}</td>
+              <td>${esc(w.kind)}</td>
+              <td>${esc(w.message)}</td>
+              <td><button class="danger small" data-del-warning="${w.id}">删除</button></td></tr>`).join('') ||
+          '<tr><td class="muted">暂无预警</td></tr>'}</tbody></table>
         <h2 style="padding:18px 0 8px">审计日志</h2>
         <table class="admin"><thead><tr><th>时间</th><th>操作</th><th>对象</th></tr></thead>
         <tbody>${audit.map((a) => `<tr><td class="muted">${fmtTime(a.at)}</td><td>${esc(a.action)}</td><td class="muted">${esc(a.actor_id ?? '-')}</td></tr>`).join('')}</tbody></table>
@@ -525,6 +556,24 @@
       if (!res.ok) banner('封禁失败:' + ((await res.json()).error || res.statusText))
       renderAdmin(el)
     }
+    $('#warn-send').onclick = async () => {
+      const userId = $('#warn-user').value
+      const message = $('#warn-message').value.trim()
+      if (!userId || !message) return banner('请填写提醒内容')
+      const res = await api('/api/admin/warnings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId, message }),
+      })
+      if (!res.ok) banner('发送失败:' + ((await res.json()).error || res.statusText))
+      renderAdmin(el)
+    }
+    for (const btn of el.querySelectorAll('[data-del-warning]')) {
+      btn.onclick = async () => {
+        await api(`/api/admin/warnings/${btn.dataset.delWarning}`, { method: 'DELETE' })
+        renderAdmin(el)
+      }
+    }
   }
 
   // ---------- boot ----------
@@ -548,10 +597,10 @@
     $('#logout').style.display = 'inline-block'
     $('#tab-admin').style.display = me.user.role === 'admin' ? 'inline-block' : 'none'
     $('#logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); await boot() }
-    banner('')
     await loadTasks()
     renderSidebar()
     renderDetail()
+    renderWarnings()
   }
 
   $('#tab-tasks').onclick = () => { state.view = 'tasks'; $('#tab-tasks').classList.add('active'); $('#tab-admin').classList.remove('active'); renderDetail() }

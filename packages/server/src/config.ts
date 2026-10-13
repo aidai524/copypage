@@ -36,6 +36,18 @@ export interface ServerConfig {
   workerMemoryMb: number
   /** default quotas by plan (per-user overrides live in the database) */
   plans: Record<string, Quota>
+  /** Resend API key; when absent, emails are logged to stdout (dev mode) */
+  resendApiKey?: string
+  /** Resend API base, overridable for tests */
+  resendBaseUrl: string
+  /** From header for outgoing mail */
+  emailFrom: string
+  /** public base URL used in email links */
+  appUrl: string
+  /** require email verification before jobs are accepted */
+  requireEmailVerification: boolean
+  /** admin notification address for abuse/alert emails (optional) */
+  adminAlertEmail?: string
   /** hard cap on stored tasks; new captures are rejected above it */
   maxTasks: number
   /** max upload size for repro zips */
@@ -130,6 +142,20 @@ export function resolveConfig(partial: Partial<ServerConfig> = {}): ServerConfig
     workerConcurrency: partial.workerConcurrency ?? Number(process.env.COPYPAGE_WORKER_CONCURRENCY ?? '2'),
     workerMemoryMb: partial.workerMemoryMb ?? Number(process.env.COPYPAGE_WORKER_MEMORY_MB ?? '3072'),
     plans: partial.plans ?? DEFAULT_PLANS,
+    resendBaseUrl: partial.resendBaseUrl ?? process.env.COPYPAGE_RESEND_BASE_URL ?? 'https://api.resend.com',
+    emailFrom: partial.emailFrom ?? process.env.COPYPAGE_EMAIL_FROM ?? 'CopyPage <onboarding@resend.dev>',
+    appUrl: (partial.appUrl ?? process.env.COPYPAGE_APP_URL ?? 'http://localhost:4400').replace(/\/$/, ''),
+    requireEmailVerification:
+      partial.requireEmailVerification ?? envBool('COPYPAGE_REQUIRE_EMAIL_VERIFICATION', false),
+    ...(partial.resendApiKey ?? process.env.COPYPAGE_RESEND_API_KEY ?? process.env.RESEND_API_KEY
+      ? {
+          resendApiKey:
+            partial.resendApiKey ?? process.env.COPYPAGE_RESEND_API_KEY ?? process.env.RESEND_API_KEY,
+        }
+      : {}),
+    ...(partial.adminAlertEmail ?? process.env.COPYPAGE_ADMIN_ALERT_EMAIL
+      ? { adminAlertEmail: partial.adminAlertEmail ?? process.env.COPYPAGE_ADMIN_ALERT_EMAIL }
+      : {}),
     ...(partial.adminEmail ?? process.env.COPYPAGE_ADMIN_EMAIL
       ? { adminEmail: partial.adminEmail ?? process.env.COPYPAGE_ADMIN_EMAIL }
       : {}),

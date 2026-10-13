@@ -155,6 +155,7 @@ export function ensureBootstrapAdmin(db: Db, config: ServerConfig): UserRow | un
     status: 'active',
     plan: 'unlimited',
     quota_json: '{}',
+    email_verified: 1,
   })
   db.audit(null, 'admin.bootstrap', { email })
   return user

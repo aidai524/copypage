@@ -12,6 +12,7 @@ import {
   ensureBootstrapAdmin,
   hashPassword,
   newId,
+  newToken,
   sessionCookie,
   tokenHash,
   verifyPassword,
@@ -19,6 +20,8 @@ import {
 } from './auth.js'
 import type { ServerConfig } from './config.js'
 import type { BlockRow, Db, UserRow } from './db.js'
+import { alertEmail, resetEmail, verificationEmail, warningEmail, type EmailClient } from './email.js'
+import { maybeQuotaWarning, warnUser, type WarningKind } from './warnings.js'
 import type { CaptureQueue } from './queue.js'
 import { extractReproZip, ReproError } from './repro.js'
 import { assertPublicUrl, SecurityError } from './security.js'
@@ -44,7 +47,17 @@ const MIME: Record<string, string> = {
 
 const MAX_BODY_BYTES = 1_000_000
 const INPUT_TYPES: TaskInputType[] = ['url', 'image', 'video']
-const OPEN_API_ROUTES = new Set(['/api/health', '/api/auth/register', '/api/auth/login', '/api/auth/logout'])
+// endpoints reachable without a session: token-based flows arrive from email
+const OPEN_API_ROUTES = new Set([
+  '/api/health',
+  '/api/auth/register',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/verify-email',
+  '/api/auth/resend-verification',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+])
 
 function json(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
   const payload = JSON.stringify(body)
@@ -113,9 +126,11 @@ export interface ApiDeps {
   publicDir: string
   /** true once any real auth exists (token, admin or registered users) */
   authRequired: () => boolean
+  /** mail transport (Resend when configured, stdout otherwise) */
+  email: EmailClient
 }
 
-export function createApiServer({ store, queue, db, config, publicDir, authRequired }: ApiDeps) {
+export function createApiServer({ store, queue, db, config, publicDir, authRequired, email }: ApiDeps) {
   // bootstrap admin so the first login works
   ensureBootstrapAdmin(db, config)
 
@@ -168,7 +183,66 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       role: user.role,
       status: user.status,
       plan: user.plan,
+      emailVerified: Boolean(user.email_verified),
       createdAt: user.created_at,
+    }
+  }
+
+  /** create a one-time email token (invalidating older ones of the same kind) */
+  function issueEmailToken(userId: string, kind: 'verify_email' | 'reset_password', ttlMs: number): string {
+    const token = newToken()
+    db.deleteEmailTokens(userId, kind)
+    db.createEmailToken({
+      id: newId(),
+      user_id: userId,
+      kind,
+      token_hash: tokenHash(token),
+      expires_at: new Date(Date.now() + ttlMs).toISOString(),
+    })
+    return token
+  }
+
+  async function sendVerificationEmail(user: UserRow): Promise<void> {
+    const token = issueEmailToken(user.id, 'verify_email', 24 * 3600_000)
+    try {
+      await email.send(verificationEmail(config, user.email, token))
+    } catch (err) {
+      console.error(`[email] verification send failed for ${user.email}: ${String(err)}`)
+      db.audit(null, 'email.send_failed', { kind: 'verify_email', email: user.email })
+    }
+  }
+
+  async function sendResetEmail(user: UserRow): Promise<void> {
+    const token = issueEmailToken(user.id, 'reset_password', 3600_000)
+    try {
+      await email.send(resetEmail(config, user.email, token))
+    } catch (err) {
+      console.error(`[email] reset send failed for ${user.email}: ${String(err)}`)
+      db.audit(null, 'email.send_failed', { kind: 'reset_password', email: user.email })
+    }
+  }
+
+  /** warn a tenant: in-app warning + optional email (never throws) */
+  async function notifyUser(userId: string, kind: WarningKind, message: string): Promise<void> {
+    const result = warnUser(db, userId, kind, message)
+    if (!result.created) return
+    const user = db.getUserById(userId)
+    if (!user || !user.email_verified) return
+    try {
+      await email.send(warningEmail(user.email, message))
+    } catch (err) {
+      console.error(`[email] warning send failed for ${user.email}: ${String(err)}`)
+    }
+  }
+
+  /** notify the operator about abuse signals (best effort, never throws) */
+  async function alertAdmin(title: string, lines: string[]): Promise<void> {
+    db.audit(null, 'alert', { title, lines })
+    if (!config.adminAlertEmail) return
+    try {
+      await email.send(alertEmail(config.adminAlertEmail, title, lines))
+    } catch (err) {
+      console.error(`[email] alert send failed: ${String(err)}`)
     }
   }
 
@@ -185,11 +259,13 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
   }
 
   function mePayload(identity: Identity) {
+    const warnings = identity.legacy ? [] : db.listWarnings(identity.userId, 20)
     return {
       user: identityPublic(identity),
       quota: resolveQuotaForOwner(db, identity.userId, config),
       usage: db.getUsage(identity.userId, today()),
       totals: quotaUsage(db, identity.userId),
+      warnings,
     }
   }
 
@@ -233,8 +309,17 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     }
 
     if (identity && identity.status === 'suspended' && !identity.legacy && !pathname.startsWith('/api/auth/')) {
+      warnUser(db, identity.userId, 'account_suspended', '账号已被暂停,请联系管理员', { dedupeHours: 72 })
       json(res, 403, { error: 'account suspended' })
       return
+    }
+
+    if (identity && !identity.legacy && config.requireEmailVerification && !pathname.startsWith('/api/auth/')) {
+      const user = db.getUserById(identity.userId)
+      if (user && !user.email_verified) {
+        json(res, 403, { error: 'email not verified', code: 'email_unverified' })
+        return
+      }
     }
 
     // ---------- health ----------
@@ -316,10 +401,17 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         status: 'active',
         plan: 'free',
         quota_json: '{}',
+        email_verified: config.requireEmailVerification ? 0 : 1,
       })
+      if (config.requireEmailVerification) await sendVerificationEmail(user)
       const token = createSession(db, user.id)
-      db.audit(user.id, 'user.register', { email })
-      json(res, 201, { user: userPublic(user) }, { 'set-cookie': sessionCookie(token) })
+      db.audit(user.id, 'user.register', { email, verificationSent: config.requireEmailVerification })
+      json(
+        res,
+        201,
+        { user: userPublic(user), verificationSent: config.requireEmailVerification },
+        { 'set-cookie': sessionCookie(token) },
+      )
       return
     }
 
@@ -344,6 +436,85 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       }
       const token = createSession(db, user.id)
       json(res, 200, { user: userPublic(user) }, { 'set-cookie': sessionCookie(token) })
+      return
+    }
+
+    if (pathname === '/api/auth/verify-email' && req.method === 'POST') {
+      let body: Record<string, unknown>
+      try {
+        body = (await readBody(req)) as Record<string, unknown>
+      } catch {
+        json(res, 400, { error: 'invalid JSON body' })
+        return
+      }
+      const token = typeof body.token === 'string' ? body.token : ''
+      const row = token ? db.getEmailToken(tokenHash(token)) : undefined
+      if (!row || row.kind !== 'verify_email') {
+        json(res, 400, { error: 'invalid or expired verification token' })
+        return
+      }
+      db.useEmailToken(row.id)
+      db.setEmailVerified(row.user_id)
+      db.audit(row.user_id, 'user.email_verified', {})
+      json(res, 200, { ok: true })
+      return
+    }
+
+    if (pathname === '/api/auth/resend-verification' && req.method === 'POST') {
+      let body: Record<string, unknown>
+      try {
+        body = (await readBody(req)) as Record<string, unknown>
+      } catch {
+        json(res, 400, { error: 'invalid JSON body' })
+        return
+      }
+      const emailAddress = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+      const user = emailAddress ? db.getUserByEmail(emailAddress) : undefined
+      if (user && !user.email_verified) await sendVerificationEmail(user)
+      // never reveal whether the account exists
+      json(res, 200, { ok: true })
+      return
+    }
+
+    if (pathname === '/api/auth/forgot-password' && req.method === 'POST') {
+      let body: Record<string, unknown>
+      try {
+        body = (await readBody(req)) as Record<string, unknown>
+      } catch {
+        json(res, 400, { error: 'invalid JSON body' })
+        return
+      }
+      const emailAddress = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+      const user = emailAddress ? db.getUserByEmail(emailAddress) : undefined
+      if (user) await sendResetEmail(user)
+      json(res, 200, { ok: true })
+      return
+    }
+
+    if (pathname === '/api/auth/reset-password' && req.method === 'POST') {
+      let body: Record<string, unknown>
+      try {
+        body = (await readBody(req)) as Record<string, unknown>
+      } catch {
+        json(res, 400, { error: 'invalid JSON body' })
+        return
+      }
+      const token = typeof body.token === 'string' ? body.token : ''
+      const password = typeof body.password === 'string' ? body.password : ''
+      if (password.length < 8) {
+        json(res, 400, { error: 'password must be at least 8 characters' })
+        return
+      }
+      const row = token ? db.getEmailToken(tokenHash(token)) : undefined
+      if (!row || row.kind !== 'reset_password') {
+        json(res, 400, { error: 'invalid or expired reset token' })
+        return
+      }
+      db.useEmailToken(row.id)
+      db.updateUser(row.user_id, { password_hash: hashPassword(password) })
+      db.deleteUserSessions(row.user_id) // force re-login everywhere
+      db.audit(row.user_id, 'user.password_reset', {})
+      json(res, 200, { ok: true })
       return
     }
 
@@ -389,6 +560,20 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       return
     }
 
+    // ---------- warnings ----------
+
+    if (pathname === '/api/warnings' && req.method === 'GET') {
+      json(res, 200, { warnings: db.listWarnings(effective.userId, 50) })
+      return
+    }
+
+    const warningAck = pathname.match(/^\/api\/warnings\/([^/]+)\/ack$/)
+    if (warningAck && req.method === 'POST') {
+      const ok = db.acknowledgeWarning(effective.userId, warningAck[1])
+      json(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'unknown warning' })
+      return
+    }
+
     // ---------- admin ----------
 
     if (pathname.startsWith('/api/admin/')) {
@@ -425,8 +610,20 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       }
       const quota = checkQuota(db, effective, 'capture', config)
       if (!quota.ok) {
+        if (!effective.legacy) void notifyUser(effective.userId, 'quota', quota.message)
         json(res, 403, { error: quota.message, code: quota.code, quota: quota.quota, usage: quota.usage })
         return
+      }
+      if (!effective.legacy) {
+        maybeQuotaWarning(db, effective.userId, 'capture', quota.usage.tasks, quota.quota.maxTasks, '任务数')
+        maybeQuotaWarning(
+          db,
+          effective.userId,
+          'storage',
+          quota.usage.storageBytes,
+          quota.quota.maxStorageBytes,
+          '存储',
+        )
       }
       if (store.count() >= config.maxTasks) {
         json(res, 507, { error: `server task limit reached (${config.maxTasks})` })
@@ -441,6 +638,14 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         }
         const host = new URL(source).hostname
         if (db.isDomainBlocked(host)) {
+          if (!effective.legacy) {
+            void notifyUser(effective.userId, 'blocked_domain', `目标站点已被平台封禁: ${host}`)
+          }
+          void alertAdmin('封禁域名捕获尝试', [
+            `用户: ${effective.email} (${effective.userId})`,
+            `目标: ${source}`,
+            `时间: ${new Date().toISOString()}`,
+          ])
           json(res, 403, { error: `domain blocked by moderation: ${host}` })
           return
         }
@@ -502,6 +707,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       }
       const quota = checkQuota(db, effective, 'generate', config)
       if (!quota.ok) {
+        if (!effective.legacy) void notifyUser(effective.userId, 'quota', quota.message)
         json(res, 403, { error: quota.message, code: quota.code, quota: quota.quota, usage: quota.usage })
         return
       }
@@ -561,6 +767,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     }
     const quota = checkQuota(db, identity, 'verify', config)
     if (!quota.ok) {
+      if (!identity.legacy) void notifyUser(identity.userId, 'quota', quota.message)
       json(res, 403, { error: quota.message, code: quota.code, quota: quota.quota, usage: quota.usage })
       return
     }
@@ -716,6 +923,41 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     if (pathname === '/api/admin/audit' && req.method === 'GET') {
       const limit = Math.min(Number(url.searchParams.get('limit') ?? '200') || 200, 1000)
       json(res, 200, { entries: db.listAudit(limit) })
+      return
+    }
+
+    if (pathname === '/api/admin/warnings' && req.method === 'GET') {
+      json(res, 200, { warnings: db.listWarnings(undefined, 200) })
+      return
+    }
+
+    if (pathname === '/api/admin/warnings' && req.method === 'POST') {
+      let body: Record<string, unknown>
+      try {
+        body = (await readBody(req)) as Record<string, unknown>
+      } catch {
+        json(res, 400, { error: 'invalid JSON body' })
+        return
+      }
+      const userId = typeof body.userId === 'string' ? body.userId : ''
+      const message = typeof body.message === 'string' ? body.message.slice(0, 500) : ''
+      if (!userId || !message) {
+        json(res, 400, { error: 'userId and message required' })
+        return
+      }
+      if (!db.getUserById(userId)) {
+        json(res, 404, { error: 'unknown user' })
+        return
+      }
+      await notifyUser(userId, 'manual', message)
+      json(res, 201, { ok: true })
+      return
+    }
+
+    const adminWarningDelete = pathname.match(/^\/api\/admin\/warnings\/([^/]+)$/)
+    if (adminWarningDelete && req.method === 'DELETE') {
+      const removed = db.deleteWarning(adminWarningDelete[1])
+      json(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'unknown warning' })
       return
     }
 

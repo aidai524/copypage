@@ -62,6 +62,17 @@ CREATE TABLE IF NOT EXISTS usage_counters (
   PRIMARY KEY (user_id, day, kind)
 );
 
+CREATE TABLE IF NOT EXISTS email_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_tokens(user_id, kind);
+
 CREATE TABLE IF NOT EXISTS blocks (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
@@ -70,6 +81,16 @@ CREATE TABLE IF NOT EXISTS blocks (
   created_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_blocks_kind_value ON blocks(kind, value);
+
+CREATE TABLE IF NOT EXISTS warnings (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  kind TEXT NOT NULL,
+  message TEXT NOT NULL,
+  acknowledged INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_warnings_user ON warnings(user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,6 +113,7 @@ export interface UserRow {
   quota_json: string
   created_at: string
   updated_at: string
+  email_verified: number
 }
 
 export interface TaskRow {
@@ -120,6 +142,15 @@ export interface BlockRow {
   created_at: string
 }
 
+export interface WarningRow {
+  id: string
+  user_id: string | null
+  kind: string
+  message: string
+  acknowledged: number
+  created_at: string
+}
+
 export interface AuditRow {
   id: number
   at: string
@@ -141,6 +172,17 @@ export class Db {
     this.db.exec('PRAGMA journal_mode = WAL')
     this.db.exec('PRAGMA busy_timeout = 5000')
     this.db.exec(SCHEMA)
+    this.migrate()
+  }
+
+  /** additive migrations for databases created before a column existed */
+  private migrate(): void {
+    const columns = this.db.prepare('PRAGMA table_info(users)').all() as { name: string }[]
+    if (!columns.some((c) => c.name === 'email_verified')) {
+      this.db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0')
+      // accounts created before verification existed stay usable
+      this.db.exec('UPDATE users SET email_verified = 1')
+    }
   }
 
   close(): void {
@@ -149,12 +191,12 @@ export class Db {
 
   // ---------- users ----------
 
-  createUser(user: Omit<UserRow, 'created_at' | 'updated_at'>): UserRow {
+  createUser(user: Omit<UserRow, 'created_at' | 'updated_at' | 'email_verified'> & { email_verified?: number }): UserRow {
     const now = new Date().toISOString()
     this.db
       .prepare(
-        `INSERT INTO users (id, email, name, password_hash, role, status, plan, quota_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, email, name, password_hash, role, status, plan, quota_json, email_verified, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         user.id,
@@ -165,10 +207,17 @@ export class Db {
         user.status,
         user.plan,
         user.quota_json,
+        user.email_verified ?? 0,
         now,
         now,
       )
     return this.getUserById(user.id)!
+  }
+
+  setEmailVerified(userId: string): void {
+    this.db
+      .prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?')
+      .run(new Date().toISOString(), userId)
   }
 
   getUserById(id: string): UserRow | undefined {
@@ -192,7 +241,9 @@ export class Db {
 
   updateUser(
     id: string,
-    patch: Partial<Pick<UserRow, 'name' | 'role' | 'status' | 'plan' | 'quota_json' | 'password_hash'>>,
+    patch: Partial<
+      Pick<UserRow, 'name' | 'role' | 'status' | 'plan' | 'quota_json' | 'password_hash' | 'email_verified'>
+    >,
   ): UserRow | undefined {
     const fields = Object.keys(patch)
     if (fields.length === 0) return this.getUserById(id)
@@ -386,6 +437,42 @@ export class Db {
     return Object.fromEntries(rows.map((r) => [r.kind, Number(r.count)]))
   }
 
+  // ---------- email tokens ----------
+
+  createEmailToken(row: { id: string; user_id: string; kind: string; token_hash: string; expires_at: string }): void {
+    this.db
+      .prepare(
+        'INSERT INTO email_tokens (id, user_id, kind, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(row.id, row.user_id, row.kind, row.token_hash, row.expires_at, new Date().toISOString())
+  }
+
+  /** valid = matching hash, unused, not expired */
+  getEmailToken(tokenHash: string): { id: string; user_id: string; kind: string } | undefined {
+    return this.db
+      .prepare(
+        `SELECT id, user_id, kind FROM email_tokens
+         WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?`,
+      )
+      .get(tokenHash, new Date().toISOString()) as { id: string; user_id: string; kind: string } | undefined
+  }
+
+  useEmailToken(id: string): void {
+    this.db.prepare('UPDATE email_tokens SET used_at = ? WHERE id = ?').run(new Date().toISOString(), id)
+  }
+
+  deleteEmailTokens(userId: string, kind: string): void {
+    this.db.prepare('DELETE FROM email_tokens WHERE user_id = ? AND kind = ?').run(userId, kind)
+  }
+
+  pruneEmailTokens(): void {
+    this.db.prepare('DELETE FROM email_tokens WHERE expires_at <= ?').run(new Date().toISOString())
+  }
+
+  deleteUserSessions(userId: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
+  }
+
   // ---------- blocks ----------
 
   addBlock(row: BlockRow): void {
@@ -408,6 +495,45 @@ export class Db {
     const h = host.toLowerCase()
     const rows = this.db.prepare("SELECT value FROM blocks WHERE kind = 'domain'").all() as { value: string }[]
     return rows.some((r) => h === r.value || h.endsWith(`.${r.value}`) || r.value === '*')
+  }
+
+  // ---------- warnings (abuse / quota signals) ----------
+
+  createWarning(row: WarningRow): void {
+    this.db
+      .prepare('INSERT INTO warnings (id, user_id, kind, message, acknowledged, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(row.id, row.user_id, row.kind, row.message, row.acknowledged, row.created_at)
+  }
+
+  /** dedupe window: same user+kind within `hours` */
+  recentWarning(userId: string | null, kind: string, hours: number): WarningRow | undefined {
+    const cutoff = new Date(Date.now() - hours * 3600_000).toISOString()
+    return this.db
+      .prepare('SELECT * FROM warnings WHERE user_id IS ? AND kind = ? AND created_at > ? ORDER BY created_at DESC LIMIT 1')
+      .get(userId, kind, cutoff)  as unknown as WarningRow | undefined
+  }
+
+  listWarnings(userId?: string, limit = 100): WarningRow[] {
+    if (userId) {
+      return this.db
+        .prepare('SELECT * FROM warnings WHERE user_id = ? ORDER BY created_at DESC LIMIT ?')
+        .all(userId, limit) as unknown as WarningRow[]
+    }
+    return this.db
+      .prepare('SELECT * FROM warnings ORDER BY created_at DESC LIMIT ?')
+      .all(limit) as unknown as WarningRow[]
+  }
+
+  acknowledgeWarning(userId: string, id: string): boolean {
+    const res = this.db
+      .prepare('UPDATE warnings SET acknowledged = 1 WHERE id = ? AND user_id = ?')
+      .run(id, userId)
+    return Number(res.changes) > 0
+  }
+
+  deleteWarning(id: string): boolean {
+    const res = this.db.prepare('DELETE FROM warnings WHERE id = ?').run(id)
+    return Number(res.changes) > 0
   }
 
   // ---------- audit ----------

@@ -40,6 +40,13 @@ export interface CaptureQueueOptions {
   }
   /** per-tenant concurrency guard (the API also checks quotas at enqueue) */
   quotaForOwner?: (ownerId: string) => Quota
+  /** failure signal for abuse/quality warnings (never throws back) */
+  onJobFailed?: (info: {
+    taskId: string
+    ownerId: string
+    kind: QueueJob['kind']
+    error: string
+  }) => void
 }
 
 const CAPTURE_TIMEOUT_MS = 20 * 60_000
@@ -64,6 +71,7 @@ export class CaptureQueue {
   private allowBuild: boolean
   private agent: NonNullable<CaptureQueueOptions['agent']>
   private quotaForOwner: ((ownerId: string) => Quota) | undefined
+  private onJobFailed: CaptureQueueOptions['onJobFailed']
 
   constructor(opts: CaptureQueueOptions) {
     if (!opts.store) throw new Error('CaptureQueue requires a store')
@@ -76,6 +84,15 @@ export class CaptureQueue {
     this.allowBuild = opts.allowBuild ?? false
     this.agent = opts.agent ?? {}
     this.quotaForOwner = opts.quotaForOwner
+    this.onJobFailed = opts.onJobFailed
+  }
+
+  private notifyFailure(job: QueueJob, error: string): void {
+    try {
+      this.onJobFailed?.({ taskId: job.taskId, ownerId: job.ownerId, kind: job.kind, error })
+    } catch {
+      // warnings must never break job supervision
+    }
   }
 
   /** queued + running jobs */
@@ -146,7 +163,7 @@ export class CaptureQueue {
       }
       await this.refreshSize(task.id)
     } catch (err) {
-      await this.fail(job.taskId, err)
+      await this.fail(job, err)
     }
   }
 
@@ -193,8 +210,13 @@ export class CaptureQueue {
       await this.refreshSize(task.id)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      await this.store.appendVerificationProgress(task.id, verification.id, `failed: ${message}`)
-      await this.store.updateVerification(task.id, verification.id, { status: 'failed', error: message })
+      try {
+        await this.store.appendVerificationProgress(task.id, verification.id, `failed: ${message}`)
+        await this.store.updateVerification(task.id, verification.id, { status: 'failed', error: message })
+      } catch {
+        // task/verification gone
+      }
+      this.notifyFailure(job, message)
     }
   }
 
@@ -261,17 +283,29 @@ export class CaptureQueue {
       await this.refreshSize(task.id)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      await this.store.appendGenerationProgress(task.id, generation.id, `failed: ${message}`)
-      await this.store.updateGeneration(task.id, generation.id, { status: 'failed', error: message })
+      try {
+        await this.store.appendGenerationProgress(task.id, generation.id, `failed: ${message}`)
+        await this.store.updateGeneration(task.id, generation.id, { status: 'failed', error: message })
+      } catch {
+        // task/generation gone
+      }
+      this.notifyFailure(job, message)
     }
   }
 
   // ---------- helpers ----------
 
-  private async fail(taskId: string, err: unknown): Promise<void> {
+  private async fail(job: QueueJob, err: unknown): Promise<void> {
     const message = err instanceof Error ? err.message : String(err)
-    await this.store.appendProgress(taskId, `failed: ${message}`)
-    await this.store.update(taskId, { status: 'failed', error: message })
+    // the task may have been deleted while the job ran: bookkeeping failures
+    // must never suppress the failure signal
+    try {
+      await this.store.appendProgress(job.taskId, `failed: ${message}`)
+      await this.store.update(job.taskId, { status: 'failed', error: message })
+    } catch {
+      // task gone
+    }
+    this.notifyFailure(job, message)
   }
 
   private async refreshSize(taskId: string): Promise<void> {
