@@ -61,11 +61,19 @@ export async function summarizeSnapshot(dir: string, durationMs: number): Promis
  * heavy, so jobs run one at a time in FIFO order. Progress streams back
  * through the store (and therefore SSE).
  */
+export interface CaptureQueueOptions {
+  /** run `npm run build` inside repro dirs; disabled by default in the server */
+  allowBuild?: boolean
+}
+
 export class CaptureQueue {
   private pending: QueueJob[] = []
   private running = false
+  private allowBuild: boolean
 
-  constructor(private store: TaskStore) {}
+  constructor(private store: TaskStore, opts: CaptureQueueOptions = {}) {
+    this.allowBuild = opts.allowBuild ?? true
+  }
 
   /** queued + running jobs */
   get size(): number {
@@ -153,6 +161,7 @@ export class CaptureQueue {
       await captureRepro(verification.reproDir, reproSnapDir, {
         viewports,
         maxNodes: task.options.maxNodes ?? 12_000,
+        allowBuild: this.allowBuild,
         onProgress,
       })
     } catch (err) {
@@ -160,7 +169,7 @@ export class CaptureQueue {
         await this.store.appendVerificationProgress(taskId, verificationId, 'repro build failed')
         await this.store.updateVerification(taskId, verificationId, {
           status: 'failed',
-          error: `repro build failed:\n${err.output.slice(-4000)}`,
+          error: `${err.message}${err.output ? `\n${err.output.slice(-4000)}` : ''}`,
         })
         return
       }

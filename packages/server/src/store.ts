@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { CaptureJobOptions, Task, TaskInput, Verification } from './types.js'
 
@@ -77,6 +77,24 @@ export class TaskStore {
 
   list(): Task[] {
     return [...this.tasks.values()].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  }
+
+  /**
+   * Retention sweep: delete finished tasks whose last update is older than
+   * maxAgeMs (running/queued jobs are never touched). Returns removed ids.
+   */
+  async cleanupOlderThan(maxAgeMs: number): Promise<string[]> {
+    const cutoff = Date.now() - maxAgeMs
+    const removed: string[] = []
+    for (const task of [...this.tasks.values()]) {
+      if (task.status === 'running' || task.status === 'queued') continue
+      if (new Date(task.updatedAt).getTime() >= cutoff) continue
+      await rm(this.taskDir(task.id), { recursive: true, force: true }).catch(() => {})
+      this.tasks.delete(task.id)
+      removed.push(task.id)
+    }
+    if (removed.length > 0) this.events.emit('cleaned', removed)
+    return removed
   }
 
   get(id: string): Task | undefined {

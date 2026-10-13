@@ -47,7 +47,8 @@ describe('capture service', () => {
   beforeAll(async () => {
     fixture = await serveStatic(FIXTURE)
     dataDir = await mkdtemp(path.join(tmpdir(), 'cp-server-'))
-    server = await startServer({ port: 0, dataDir })
+    // fixtures live on loopback: this server explicitly opts into local-network captures
+    server = await startServer({ port: 0, dataDir, allowPrivateNetwork: true })
   }, 60_000)
 
   afterAll(async () => {

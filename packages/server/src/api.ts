@@ -5,7 +5,9 @@ import path from 'node:path'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { CaptureQueue } from './queue.js'
+import type { ServerConfig } from './config.js'
 import { extractReproZip, ReproError } from './repro.js'
+import { assertPublicUrl, SecurityError, tokenMatches } from './security.js'
 import type { TaskStore } from './store.js'
 import type { CaptureJobOptions, TaskInputType } from './types.js'
 
@@ -26,7 +28,6 @@ const MIME: Record<string, string> = {
 }
 
 const MAX_BODY_BYTES = 1_000_000
-const MAX_ZIP_BYTES = 200 * 1024 * 1024
 const INPUT_TYPES: TaskInputType[] = ['url', 'image', 'video']
 
 function json(res: ServerResponse, status: number, body: unknown): void {
@@ -88,18 +89,34 @@ export interface ApiDeps {
   store: TaskStore
   queue: CaptureQueue
   publicDir: string
+  config: ServerConfig
 }
 
-export function createApiServer({ store, queue, publicDir }: ApiDeps) {
+export function createApiServer({ store, queue, publicDir, config }: ApiDeps) {
   const server = createServer((req, res) => {
     void handle(req, res).catch((err) => {
       json(res, 500, { error: err instanceof Error ? err.message : String(err) })
     })
   })
 
+  /** bearer header, or ?token= for EventSource (which cannot set headers) */
+  function authorized(req: IncomingMessage, url: URL): boolean {
+    if (!config.token) return true
+    const header = req.headers.authorization
+    const provided = header?.startsWith('Bearer ')
+      ? header.slice(7)
+      : (url.searchParams.get('token') ?? '')
+    return provided.length > 0 && tokenMatches(provided, config.token)
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const pathname = url.pathname
+
+    if (pathname.startsWith('/api/') && !authorized(req, url)) {
+      json(res, 401, { error: 'unauthorized — send Authorization: Bearer <token>' })
+      return
+    }
 
     if (pathname === '/' && req.method === 'GET') {
       const html = await readFile(path.join(publicDir, 'index.html'), 'utf8')
@@ -152,6 +169,20 @@ export function createApiServer({ store, queue, publicDir }: ApiDeps) {
       if (!INPUT_TYPES.includes(type) || !source) {
         json(res, 400, { error: 'type must be url|image|video and source must be non-empty' })
         return
+      }
+      if (store.list().length >= config.maxTasks) {
+        json(res, 507, {
+          error: `task limit reached (${config.maxTasks}); wait for retention cleanup`,
+        })
+        return
+      }
+      if (type === 'url') {
+        try {
+          await assertPublicUrl(source, { allowPrivateNetwork: config.allowPrivateNetwork })
+        } catch (err) {
+          json(res, 400, { error: err instanceof SecurityError ? err.message : String(err) })
+          return
+        }
       }
       const task = await store.create({ type, source }, sanitizeOptions(input.options))
       queue.enqueue({ kind: 'capture', taskId: task.id })
@@ -214,7 +245,7 @@ export function createApiServer({ store, queue, publicDir }: ApiDeps) {
       const verDir = store.verificationDir(taskId, verification.id)
       const zipPath = path.join(verDir, 'upload.zip')
       try {
-        await saveBodyToFile(req, zipPath, MAX_ZIP_BYTES)
+        await saveBodyToFile(req, zipPath, config.maxUploadBytes)
         const reproDir = await extractReproZip(zipPath, path.join(verDir, 'repro'))
         await store.updateVerification(taskId, verification.id, {
           reproDir,

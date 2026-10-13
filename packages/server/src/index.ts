@@ -1,49 +1,54 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApiServer } from './api.js'
+import { resolveConfig, type ServerConfig } from './config.js'
 import { CaptureQueue } from './queue.js'
 import { TaskStore } from './store.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-export interface StartServerOptions {
-  /** 0 picks a random free port (used by tests) */
-  port?: number
-  host?: string
-  dataDir?: string
-  publicDir?: string
-}
+export type StartServerOptions = Partial<ServerConfig>
 
 export interface RunningServer {
   url: string
   port: number
+  config: ServerConfig
   store: TaskStore
   queue: CaptureQueue
   close(): Promise<void>
 }
 
-/** Boot the capture service: task store + serial queue + HTTP API/UI. */
+/** Boot the capture/verify service: task store + serial queue + HTTP API/UI. */
 export async function startServer(opts: StartServerOptions = {}): Promise<RunningServer> {
-  const host = opts.host ?? '127.0.0.1'
   const dataDir = path.resolve(opts.dataDir ?? 'work/server')
-  const publicDir = opts.publicDir ?? path.join(here, '..', 'public')
+  const config: ServerConfig = { ...resolveConfig(opts), dataDir }
+  const publicDir = config.publicDir ?? path.join(here, '..', 'public')
 
   const store = new TaskStore(dataDir)
   await store.init()
-  const queue = new CaptureQueue(store)
-  const server = createApiServer({ store, queue, publicDir })
+  const queue = new CaptureQueue(store, { allowBuild: config.allowBuild })
+  const server = createApiServer({ store, queue, publicDir, config })
 
-  await new Promise<void>((resolve) => server.listen(opts.port ?? 4400, host, resolve))
+  await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve))
   const addr = server.address()
-  const port = typeof addr === 'object' && addr ? addr.port : (opts.port ?? 4400)
+  const port = typeof addr === 'object' && addr ? addr.port : config.port
+
+  const sweep = () => {
+    void store.cleanupOlderThan(config.retentionMs).catch(() => {})
+  }
+  sweep()
+  const timer = setInterval(sweep, config.cleanupIntervalMs)
+  timer.unref()
 
   return {
-    url: `http://${host}:${port}`,
+    url: `http://${config.host}:${port}`,
     port,
+    config,
     store,
     queue,
     close: () =>
       new Promise<void>((resolve, reject) => {
+        clearInterval(timer)
         server.close((err) => (err ? reject(err) : resolve()))
       }),
   }
@@ -51,3 +56,6 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
 
 export { TaskStore, CaptureQueue }
 export * from './types.js'
+export { resolveConfig, isLoopbackHost } from './config.js'
+export type { ServerConfig } from './config.js'
+export { assertPublicUrl, isPrivateAddress, SecurityError } from './security.js'

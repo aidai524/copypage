@@ -1,0 +1,61 @@
+export interface ServerConfig {
+  host: string
+  port: number
+  dataDir: string
+  publicDir?: string
+  /** when set, every /api/* request must present this bearer token */
+  token?: string
+  /** allow captures/verifications that touch loopback/private networks (local fixtures only) */
+  allowPrivateNetwork: boolean
+  /** run `npm run build` inside submitted repro dirs. OFF by default: build = arbitrary code execution */
+  allowBuild: boolean
+  /** hard cap on stored tasks; new captures are rejected above it */
+  maxTasks: number
+  /** max upload size for repro zips */
+  maxUploadBytes: number
+  /** delete finished tasks older than this */
+  retentionMs: number
+  /** how often the retention sweeper runs */
+  cleanupIntervalMs: number
+}
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0:0:0:0:0:0:0:1'])
+
+export function isLoopbackHost(host: string): boolean {
+  return LOOPBACK_HOSTS.has(host)
+}
+
+function envBool(name: string, fallback: boolean): boolean {
+  const v = process.env[name]
+  if (v === undefined) return fallback
+  return ['1', 'true', 'yes', 'on'].includes(v.toLowerCase())
+}
+
+/**
+ * Defaults are the safe ones: no build execution, no private-network access,
+ * bearer token required as soon as the server is not bound to loopback.
+ */
+export function resolveConfig(partial: Partial<ServerConfig> = {}): ServerConfig {
+  const host = partial.host ?? '127.0.0.1'
+  const token = partial.token ?? process.env.COPYPAGE_TOKEN ?? undefined
+  const config: ServerConfig = {
+    host,
+    port: partial.port ?? 4400,
+    dataDir: partial.dataDir ?? 'work/server',
+    ...(partial.publicDir ? { publicDir: partial.publicDir } : {}),
+    ...(token ? { token } : {}),
+    allowPrivateNetwork: partial.allowPrivateNetwork ?? envBool('COPYPAGE_ALLOW_PRIVATE_NETWORK', false),
+    allowBuild: partial.allowBuild ?? envBool('COPYPAGE_ALLOW_BUILD', false),
+    maxTasks: partial.maxTasks ?? Number(process.env.COPYPAGE_MAX_TASKS ?? '50'),
+    maxUploadBytes: partial.maxUploadBytes ?? Number(process.env.COPYPAGE_MAX_UPLOAD_MB ?? '200') * 1024 * 1024,
+    retentionMs: partial.retentionMs ?? Number(process.env.COPYPAGE_RETENTION_HOURS ?? '168') * 3600_000,
+    cleanupIntervalMs: partial.cleanupIntervalMs ?? 3600_000,
+  }
+
+  if (!isLoopbackHost(config.host) && !config.token) {
+    throw new Error(
+      `refusing to bind ${config.host} without a token — set --token / COPYPAGE_TOKEN, or bind 127.0.0.1`,
+    )
+  }
+  return config
+}

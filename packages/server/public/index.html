@@ -35,6 +35,10 @@
   header h1 { font-size: 15px; font-weight: 600; margin: 0; }
   header .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--green); }
   header .meta { margin-left: auto; color: var(--faint); font-size: 12px; }
+  header .auth { display: flex; gap: 6px; align-items: center; margin-left: 16px; }
+  header .auth input { width: 170px; height: 28px; padding: 0 8px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 12px; }
+  header .auth button { height: 28px; padding: 0 10px; font-size: 12px; }
+  .banner { margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px; background: rgba(251,191,36,.12); color: var(--amber); font-size: 13px; display: none; }
   main { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; padding: 20px; align-items: start; }
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
   .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin: 0; padding: 14px 16px 8px; }
@@ -126,7 +130,12 @@
   <span class="dot"></span>
   <h1>CopyPage · 捕获服务</h1>
   <span class="meta" id="health">…</span>
+  <div class="auth">
+    <input type="password" id="token" placeholder="访问令牌（服务器设置了才需要）" />
+    <button id="token-save">保存</button>
+  </div>
 </header>
+<div class="banner" id="banner"></div>
 
 <main>
   <aside class="panel">
@@ -166,6 +175,21 @@
 <script>
   const $ = (s) => document.querySelector(s)
   const state = { tasks: [], selected: null }
+  const tokenStore = {
+    get() { return localStorage.getItem('copypage-token') || '' },
+    set(v) { v ? localStorage.setItem('copypage-token', v) : localStorage.removeItem('copypage-token') },
+  }
+  function apiFetch(path, init = {}) {
+    const headers = { ...(init.headers || {}) }
+    const token = tokenStore.get()
+    if (token) headers.authorization = 'Bearer ' + token
+    return fetch(path, { ...init, headers })
+  }
+  function banner(msg) {
+    const el = $('#banner')
+    el.textContent = msg || ''
+    el.style.display = msg ? 'block' : 'none'
+  }
   const STATUS = { queued: '排队中', running: '捕获中', done: '完成', failed: '失败' }
   const VSTATUS = { queued: '排队中', running: '验证中', done: '完成', failed: '失败' }
   const DECISION = { pass: '通过', continue: '继续迭代', escalate: '升级诊断', 'stagnant-stop': '停滞终止', 'cap-stop': '轮次上限' }
@@ -270,7 +294,7 @@
     if (!pathBtn || !zipBtn) return
 
     const post = async (body, headers = {}) => {
-      const res = await fetch(`/api/tasks/${t.id}/verifications`, {
+      const res = await apiFetch(`/api/tasks/${t.id}/verifications`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...headers },
         body,
@@ -362,11 +386,18 @@
   }
 
   async function refresh() {
-    const data = await (await fetch('/api/tasks')).json()
-    state.tasks = data.tasks
-    if (!state.selected && state.tasks.length > 0) state.selected = state.tasks[0].id
-    $('#health').textContent = `队列 ${data.queue} · 任务 ${state.tasks.length}`
-    renderTasks(); renderDetail()
+    try {
+      const res = await apiFetch('/api/tasks')
+      if (res.status === 401) { banner('需要访问令牌：在右上角输入服务器启动时设置的 token'); return }
+      const data = await res.json()
+      state.tasks = data.tasks
+      if (!state.selected && state.tasks.length > 0) state.selected = state.tasks[0].id
+      $('#health').textContent = `队列 ${data.queue} · 任务 ${state.tasks.length}`
+      banner('')
+      renderTasks(); renderDetail()
+    } catch (err) {
+      banner('无法连接服务：' + err.message)
+    }
   }
 
   $('#new-task').addEventListener('submit', async (ev) => {
@@ -385,7 +416,7 @@
           states: $('#states').checked,
         },
       }
-      const res = await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      const res = await apiFetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || res.statusText)
       upsert(data.task); state.selected = data.task.id
@@ -397,14 +428,20 @@
     }
   })
 
-  const events = new EventSource('/api/events')
+  const events = new EventSource('/api/events' + (tokenStore.get() ? '?token=' + encodeURIComponent(tokenStore.get()) : ''))
   events.addEventListener('task', (ev) => {
     const task = JSON.parse(ev.data)
     upsert(task)
     if (state.selected === task.id) renderDetail()
     renderTasks()
-    fetch('/api/health').then((r) => r.json()).then((h) => { $('#health').textContent = `队列 ${h.queue} · 任务 ${h.tasks}` }).catch(() => {})
+    apiFetch('/api/health').then((r) => { if (r.ok) return r.json(); return null }).then((h) => { if (h) $('#health').textContent = `队列 ${h.queue} · 任务 ${h.tasks}` }).catch(() => {})
   })
+
+  $('#token').value = tokenStore.get()
+  $('#token-save').onclick = () => {
+    tokenStore.set($('#token').value.trim())
+    location.reload()
+  }
 
   refresh()
 </script>
