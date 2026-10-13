@@ -4,7 +4,7 @@ import { createApiServer } from './api.js'
 import { resolveConfig, type ServerConfig } from './config.js'
 import { Db } from './db.js'
 import { CaptureQueue } from './queue.js'
-import { resolveQuota } from './quotas.js'
+import { resolveQuotaForOwner } from './quotas.js'
 import { TaskStore } from './store.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -43,7 +43,7 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
       timeoutMs: config.agentTimeoutMs,
       ...(config.agentModel ? { model: config.agentModel } : {}),
     },
-    quotaForOwner: (ownerId) => resolveQuota(db.getUserById(ownerId), config),
+    quotaForOwner: (ownerId) => resolveQuotaForOwner(db, ownerId, config),
   })
 
   const authRequired = () =>
@@ -90,5 +90,5 @@ export * from './types.js'
 export { resolveConfig, isLoopbackHost } from './config.js'
 export type { ServerConfig, Quota } from './config.js'
 export { assertPublicUrl, isPrivateAddress, SecurityError } from './security.js'
-export { checkQuota, resolveQuota, quotaUsage } from './quotas.js'
+export { checkQuota, resolveQuota, resolveQuotaForOwner, quotaUsage } from './quotas.js'
 export { authenticate, hashPassword, verifyPassword } from './auth.js'

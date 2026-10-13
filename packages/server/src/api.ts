@@ -22,7 +22,7 @@ import type { BlockRow, Db, UserRow } from './db.js'
 import type { CaptureQueue } from './queue.js'
 import { extractReproZip, ReproError } from './repro.js'
 import { assertPublicUrl, SecurityError } from './security.js'
-import { checkQuota, quotaUsage, resolveQuota, today } from './quotas.js'
+import { checkQuota, quotaUsage, resolveQuotaForOwner, today } from './quotas.js'
 import type { TaskStore } from './store.js'
 import type { CaptureJobOptions, TaskInputType } from './types.js'
 
@@ -185,10 +185,9 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
   }
 
   function mePayload(identity: Identity) {
-    const user = db.getUserById(identity.userId)
     return {
       user: identityPublic(identity),
-      quota: resolveQuota(user, config),
+      quota: resolveQuotaForOwner(db, identity.userId, config),
       usage: db.getUsage(identity.userId, today()),
       totals: quotaUsage(db, identity.userId),
     }
@@ -640,7 +639,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     if (pathname === '/api/admin/users' && req.method === 'GET') {
       const users = db.listUsers().map((user) => ({
         ...userPublic(user),
-        quota: resolveQuota(user, config),
+        quota: resolveQuotaForOwner(db, user.id, config),
         totals: quotaUsage(db, user.id),
       }))
       json(res, 200, { users })

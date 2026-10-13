@@ -34,6 +34,15 @@ export function resolveQuota(user: UserRow | undefined, config: ServerConfig): Q
   return { ...base, ...overrides }
 }
 
+/**
+ * Quota for a task owner id. The legacy single-token/system identity always
+ * runs unlimited — it is the operator, not a tenant.
+ */
+export function resolveQuotaForOwner(db: Db, ownerId: string, config: ServerConfig): Quota {
+  if (ownerId === 'system') return config.plans.unlimited ?? config.plans.free
+  return resolveQuota(db.getUserById(ownerId), config)
+}
+
 export function quotaUsage(db: Db, userId: string): QuotaUsage {
   return {
     tasks: db.countTasks(userId),
