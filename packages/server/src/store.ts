@@ -333,6 +333,7 @@ export class TaskStore {
     const task = this.get(id)
     if (!task) return false
     await rm(this.taskDir(id), { recursive: true, force: true }).catch(() => {})
+    this.db.deleteJobsForTask(id)
     const removed = this.db.deleteTask(id)
     if (removed) this.events.emit('cleaned', [id])
     return removed

@@ -401,9 +401,31 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       }
       store.events.on('task', onTask)
       store.events.on('cleaned', onCleaned)
+
+      // cross-instance: poll rows changed since the last tick so updates made
+      // by another API/worker instance also reach this stream
+      const scope = effective.role === 'admin' ? undefined : effective.userId
+      let since = new Date().toISOString()
+      const poll = setInterval(() => {
+        try {
+          const rows = db.listTasksUpdatedSince(scope, since, 100)
+          for (const row of rows) {
+            since = row.updated_at > since ? row.updated_at : since
+            const task = store.get(row.id)
+            if (!task) continue
+            if (effective.role !== 'admin' && task.ownerId !== effective.userId) continue
+            res.write(`event: task\ndata: ${JSON.stringify(task)}\n\n`)
+          }
+        } catch (err) {
+          console.error(`[sse] poll failed: ${String(err)}`)
+        }
+      }, 2000)
+      poll.unref?.()
+
       const heartbeat = setInterval(() => res.write(': ping\n\n'), 25_000)
       req.on('close', () => {
         clearInterval(heartbeat)
+        clearInterval(poll)
         store.events.off('task', onTask)
         store.events.off('cleaned', onCleaned)
       })

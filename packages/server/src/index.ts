@@ -2,7 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApiServer } from './api.js'
 import { resolveConfig, type ServerConfig } from './config.js'
-import { Db } from './db.js'
+import { SqliteDb, type Db } from './db.js'
 import { startAlertRunner } from './alerts.js'
 import { alertEmail, createEmailClient, type EmailClient } from './email.js'
 import { Metrics } from './metrics.js'
@@ -42,13 +42,14 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
     const version = await assertDockerAvailable()
     console.log(`[sandbox] docker ${version} · image ${config.workerImage} · network ${config.workerNetwork}`)
   }
-  const db = new Db(dataDir)
+  const db = new SqliteDb(dataDir)
   const imported = await importLegacyTasks(dataDir, db)
   if (imported > 0) console.log(`[migrate] imported ${imported} task(s) from the pre-SQLite file store`)
   const store = new TaskStore(dataDir, db)
   const email = opts.emailClient ?? createEmailClient(config)
   const queue = new CaptureQueue({
     store,
+    db,
     repoRoot,
     concurrency: config.workerConcurrency,
     memoryMb: config.workerMemoryMb,
@@ -161,6 +162,7 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
         clearInterval(timer)
         clearInterval(gaugeTimer)
         alertRunner.stop()
+        queue.close()
         server.close((err) => {
           if (err) {
             reject(err)

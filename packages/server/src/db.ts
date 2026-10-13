@@ -54,6 +54,22 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 
+CREATE TABLE IF NOT EXISTS jobs (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  task_id TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'queued',
+  instance_id TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_task ON jobs(task_id);
+
 CREATE TABLE IF NOT EXISTS usage_counters (
   user_id TEXT NOT NULL,
   day TEXT NOT NULL,
@@ -142,6 +158,33 @@ export interface BlockRow {
   created_at: string
 }
 
+const TASK_UPDATABLE_FIELDS = [
+  'status',
+  'progress_json',
+  'loop_json',
+  'verifications_json',
+  'generations_json',
+  'result_json',
+  'worker_json',
+  'size_bytes',
+  'error',
+  'updated_at',
+] as const
+
+export interface JobRow {
+  id: string
+  kind: 'capture' | 'verify' | 'generate'
+  task_id: string
+  owner_id: string
+  payload_json: string
+  status: 'queued' | 'running' | 'done' | 'failed'
+  instance_id: string | null
+  error: string | null
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+}
+
 export interface WarningRow {
   id: string
   user_id: string | null
@@ -163,7 +206,69 @@ export interface AuditRow {
  * SQLite-backed multi-tenant state. The database is the source of truth for
  * users, sessions, tasks and usage; artifacts stay on disk under dataDir.
  */
-export class Db {
+/**
+ * State store contract shared by the SQLite (single-host) and Postgres
+ * (multi-host) backends. Consumers depend on this type, not the driver.
+ */
+export interface Db {
+  readonly isPg?: boolean
+  createUser(user: Omit<UserRow, 'created_at' | 'updated_at' | 'email_verified'> & { email_verified?: number }): UserRow
+  getUserById(id: string): UserRow | undefined
+  getUserByEmail(email: string): UserRow | undefined
+  listUsers(): UserRow[]
+  countUsers(): number
+  updateUser(
+    id: string,
+    patch: Partial<Pick<UserRow, 'name' | 'role' | 'status' | 'plan' | 'quota_json' | 'password_hash' | 'email_verified'>>,
+  ): UserRow | undefined
+  setEmailVerified(userId: string): void
+  createSession(tokenHash: string, userId: string, expiresAt: string): void
+  getUserBySessionHash(tokenHash: string): UserRow | undefined
+  deleteSession(tokenHash: string): void
+  pruneSessions(): number
+  createApiToken(row: { id: string; user_id: string; name: string | null; token_hash: string }): void
+  getUserByApiTokenHash(tokenHash: string): UserRow | undefined
+  listApiTokens(userId: string): { id: string; name: string | null; created_at: string; last_used_at: string | null }[]
+  deleteApiToken(userId: string, id: string): boolean
+  insertTask(row: TaskRow): void
+  updateTask(id: string, patch: Record<string, string | number | null>): void
+  getTask(id: string): TaskRow | undefined
+  listTasks(ownerId?: string, limit?: number): TaskRow[]
+  deleteTask(id: string): boolean
+  countTasks(ownerId?: string): number
+  sumStorage(ownerId?: string): number
+  countActiveTasks(ownerId: string): number
+  expiredTaskIds(cutoffIso: string): string[]
+  enqueueJob(row: JobRow): void
+  claimJob(instanceId: string, excludeOwners?: string[]): JobRow | undefined
+  finishJob(id: string, status: 'done' | 'failed', error?: string): void
+  requeueStaleJobs(timeoutMs: number): number
+  countJobs(status?: JobRow['status'], ownerId?: string): number
+  listJobs(limit?: number): JobRow[]
+  deleteJobsForTask(taskId: string): void
+  listTasksUpdatedSince(ownerId: string | undefined, sinceIso: string, limit?: number): TaskRow[]
+  incrUsage(userId: string, kind: string, day: string, by?: number): void
+  getUsage(userId: string, day: string): Record<string, number>
+  createEmailToken(row: { id: string; user_id: string; kind: string; token_hash: string; expires_at: string }): void
+  getEmailToken(tokenHash: string): { id: string; user_id: string; kind: string } | undefined
+  useEmailToken(id: string): void
+  deleteEmailTokens(userId: string, kind: string): void
+  pruneEmailTokens(): void
+  deleteUserSessions(userId: string): void
+  createWarning(row: WarningRow): void
+  recentWarning(userId: string | null, kind: string, hours: number): WarningRow | undefined
+  listWarnings(userId?: string, limit?: number): WarningRow[]
+  acknowledgeWarning(userId: string, id: string): boolean
+  deleteWarning(id: string): boolean
+  addBlock(row: BlockRow): void
+  removeBlock(id: string): boolean
+  listBlocks(): BlockRow[]
+  isDomainBlocked(host: string): boolean
+  audit(actorId: string | null, action: string, detail?: unknown): void
+  listAudit(limit?: number): AuditRow[]
+}
+
+export class SqliteDb implements Db {
   readonly db: DatabaseSync
 
   constructor(dataDir: string) {
@@ -343,27 +448,14 @@ export class Db {
       )
   }
 
-  private static UPDATABLE = [
-    'status',
-    'progress_json',
-    'loop_json',
-    'verifications_json',
-    'generations_json',
-    'result_json',
-    'worker_json',
-    'size_bytes',
-    'error',
-    'updated_at',
-  ] as const
-
-  updateTask(id: string, patch: Partial<Record<(typeof Db.UPDATABLE)[number], string | number | null>>): void {
+  updateTask(id: string, patch: Partial<Record<(typeof TASK_UPDATABLE_FIELDS)[number], string | number | null>>): void {
     const fields = Object.keys(patch)
     if (fields.length === 0) return
     for (const key of fields) {
-      if (!(Db.UPDATABLE as readonly string[]).includes(key)) throw new Error(`task field not updatable: ${key}`)
+      if (!(TASK_UPDATABLE_FIELDS as readonly string[]).includes(key)) throw new Error(`task field not updatable: ${key}`)
     }
     const sets = fields.map((f) => `${f} = ?`).join(', ')
-    const values = fields.map((f) => patch[f as (typeof Db.UPDATABLE)[number]] as string | number | null)
+    const values = fields.map((f) => patch[f as (typeof TASK_UPDATABLE_FIELDS)[number]] as string | number | null)
     this.db.prepare(`UPDATE tasks SET ${sets} WHERE id = ?`).run(...values, id)
   }
 
@@ -417,6 +509,101 @@ export class Db {
         .prepare("SELECT id FROM tasks WHERE status NOT IN ('queued','running') AND updated_at < ?")
         .all(cutoffIso) as { id: string }[]
     ).map((r) => r.id)
+  }
+
+  // ---------- job queue (multi-instance safe) ----------
+
+  enqueueJob(row: JobRow): void {
+    this.db
+      .prepare(
+        `INSERT INTO jobs (id, kind, task_id, owner_id, payload_json, status, created_at)
+         VALUES (?, ?, ?, ?, ?, 'queued', ?)`,
+      )
+      .run(row.id, row.kind, row.task_id, row.owner_id, row.payload_json, row.created_at)
+  }
+
+  /**
+   * Atomically claim the oldest queued job this instance can run. Excluded
+   * owners are those already at their per-tenant concurrency limit.
+   */
+  claimJob(instanceId: string, excludeOwners: string[] = []): JobRow | undefined {
+    const now = new Date().toISOString()
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      const placeholders = excludeOwners.map(() => '?').join(',')
+      const sql = `SELECT * FROM jobs WHERE status = 'queued'
+        ${excludeOwners.length ? `AND owner_id NOT IN (${placeholders})` : ''}
+        ORDER BY created_at LIMIT 1`
+      const row = this.db.prepare(sql).get(...excludeOwners) as JobRow | undefined
+      if (!row) {
+        this.db.exec('COMMIT')
+        return undefined
+      }
+      const res = this.db
+        .prepare("UPDATE jobs SET status = 'running', instance_id = ?, started_at = ? WHERE id = ? AND status = 'queued'")
+        .run(instanceId, now, row.id)
+      this.db.exec('COMMIT')
+      if (Number(res.changes) !== 1) return undefined
+      return { ...row, status: 'running', instance_id: instanceId, started_at: now }
+    } catch (err) {
+      this.db.exec('ROLLBACK')
+      throw err
+    }
+  }
+
+  finishJob(id: string, status: 'done' | 'failed', error?: string): void {
+    this.db
+      .prepare('UPDATE jobs SET status = ?, error = ?, finished_at = ? WHERE id = ?')
+      .run(status, error ?? null, new Date().toISOString(), id)
+  }
+
+  /** jobs whose instance died mid-run: put them back on the queue */
+  requeueStaleJobs(timeoutMs: number): number {
+    const cutoff = new Date(Date.now() - timeoutMs).toISOString()
+    const res = this.db
+      .prepare(
+        "UPDATE jobs SET status = 'queued', instance_id = NULL, started_at = NULL WHERE status = 'running' AND started_at < ?",
+      )
+      .run(cutoff)
+    return Number(res.changes)
+  }
+
+  countJobs(status?: JobRow['status'], ownerId?: string): number {
+    const clauses: string[] = []
+    const values: string[] = []
+    if (status) {
+      clauses.push('status = ?')
+      values.push(status)
+    }
+    if (ownerId) {
+      clauses.push('owner_id = ?')
+      values.push(ownerId)
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+    const row = this.db.prepare(`SELECT COUNT(*) AS n FROM jobs ${where}`).get(...values) as { n: number }
+    return row.n
+  }
+
+  listJobs(limit = 100): JobRow[] {
+    return this.db
+      .prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?')
+      .all(limit) as unknown as JobRow[]
+  }
+
+  deleteJobsForTask(taskId: string): void {
+    this.db.prepare('DELETE FROM jobs WHERE task_id = ?').run(taskId)
+  }
+
+  /** tasks changed since a timestamp — drives SSE polling across instances */
+  listTasksUpdatedSince(ownerId: string | undefined, sinceIso: string, limit = 100): TaskRow[] {
+    if (ownerId) {
+      return this.db
+        .prepare('SELECT * FROM tasks WHERE owner_id = ? AND updated_at > ? ORDER BY updated_at LIMIT ?')
+        .all(ownerId, sinceIso, limit) as unknown as TaskRow[]
+    }
+    return this.db
+      .prepare('SELECT * FROM tasks WHERE updated_at > ? ORDER BY updated_at LIMIT ?')
+      .all(sinceIso, limit) as unknown as TaskRow[]
   }
 
   // ---------- usage ----------

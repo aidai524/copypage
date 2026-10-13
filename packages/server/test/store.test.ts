@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Db } from '../src/db.js'
+import { SqliteDb as Db } from '../src/db.js'
 import { TaskStore } from '../src/store.js'
 
 describe('TaskStore', () => {

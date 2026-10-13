@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import os from 'node:os'
 import { createInterface } from 'node:readline'
 import path from 'node:path'
+import type { Db } from './db.js'
 import type { Quota } from './config.js'
 import type { Metrics } from './metrics.js'
 import { buildDockerArgs, mapSpecPaths, type SandboxOptions } from './sandbox.js'
@@ -24,6 +27,10 @@ export interface QueueJob {
 
 export interface CaptureQueueOptions {
   store: TaskStore
+  /** shared state database: jobs live here so any instance can claim them */
+  db: Db
+  /** instance identity for job claiming (defaults to hostname:pid) */
+  instanceId?: string
   /** repo root holding packages/ and skill/ (worker + agent cwd) */
   repoRoot?: string
   workerPath?: string
@@ -69,6 +76,10 @@ export class CaptureQueue {
   private running = 0
   private runningByOwner = new Map<string, number>()
   private store: TaskStore
+  private db: Db
+  private instanceId: string
+  private pollTimer: NodeJS.Timeout
+  private requeueTimer: NodeJS.Timeout
   private repoRoot: string
   private workerPath: string
   private tsxPath: string
@@ -85,7 +96,16 @@ export class CaptureQueue {
 
   constructor(opts: CaptureQueueOptions) {
     if (!opts.store) throw new Error('CaptureQueue requires a store')
+    if (!opts.db) throw new Error('CaptureQueue requires a db')
     this.store = opts.store
+    this.db = opts.db
+    this.instanceId = opts.instanceId ?? `${os.hostname()}:${process.pid}`
+    this.pollTimer = setInterval(() => {
+      void this.pump().catch((err) => console.error(`[queue] pump failed: ${String(err)}`))
+    }, 2000)
+    this.pollTimer.unref()
+    this.requeueTimer = setInterval(() => this.requeueStale(), 60_000)
+    this.requeueTimer.unref()
     this.repoRoot = opts.repoRoot ?? process.cwd()
     this.workerPath = opts.workerPath ?? path.join(this.repoRoot, 'packages/server/src/worker.ts')
     this.tsxPath = opts.tsxPath ?? path.join(this.repoRoot, 'node_modules/.bin/tsx')
@@ -124,31 +144,84 @@ export class CaptureQueue {
     }
   }
 
-  /** queued + running jobs */
-  get size(): number {
-    return this.pending.length + this.running
+  /** stop polling (server shutdown); running jobs keep their own processes */
+  close(): void {
+    clearInterval(this.pollTimer)
+    clearInterval(this.requeueTimer)
   }
 
+  /** queued (shared) + running (this instance) jobs */
+  get size(): number {
+    return this.db.countJobs('queued') + this.running
+  }
+
+  /** persist the job first: another instance may claim it if this one dies */
   enqueue(job: QueueJob): void {
-    this.pending.push(job)
+    this.db.enqueueJob({
+      id: randomUUID(),
+      kind: job.kind,
+      task_id: job.taskId,
+      owner_id: job.ownerId,
+      payload_json: JSON.stringify({
+        ...(job.verificationId ? { verificationId: job.verificationId } : {}),
+        ...(job.generationId ? { generationId: job.generationId } : {}),
+      }),
+      status: 'queued',
+      instance_id: null,
+      error: null,
+      created_at: new Date().toISOString(),
+      started_at: null,
+      finished_at: null,
+    })
+    if (this.pending.length < 10_000) this.pending.push(job) // local fast path
     void this.pump()
   }
 
-  private canStart(job: QueueJob): boolean {
-    if (!this.quotaForOwner) return true
-    const limit = this.quotaForOwner(job.ownerId).maxConcurrent
-    return (this.runningByOwner.get(job.ownerId) ?? 0) < limit
+  /** owners already at their concurrency limit on this instance */
+  private busyOwners(): string[] {
+    if (!this.quotaForOwner) return []
+    const busy: string[] = []
+    for (const [ownerId, count] of this.runningByOwner) {
+      if (count >= this.quotaForOwner(ownerId).maxConcurrent) busy.push(ownerId)
+    }
+    return busy
   }
 
   private async pump(): Promise<void> {
     while (this.running < this.concurrency) {
-      const index = this.pending.findIndex((job) => this.canStart(job))
-      if (index < 0) return
-      const [job] = this.pending.splice(index, 1)
+      const claimed = this.db.claimJob(this.instanceId, this.busyOwners())
+      if (!claimed) {
+        // nothing claimable: drop local entries that other instances took
+        this.pending = this.pending.filter((job) =>
+          this.db.listJobs(200).some(
+            (row) =>
+              row.task_id === job.taskId &&
+              row.status === 'queued' &&
+              (job.verificationId ? row.payload_json.includes(job.verificationId) : true) &&
+              (job.generationId ? row.payload_json.includes(job.generationId) : true),
+          ),
+        )
+        return
+      }
+      const payload = JSON.parse(claimed.payload_json) as {
+        verificationId?: string
+        generationId?: string
+      }
+      const job: QueueJob = {
+        kind: claimed.kind,
+        taskId: claimed.task_id,
+        ownerId: claimed.owner_id,
+        ...(payload.verificationId ? { verificationId: payload.verificationId } : {}),
+        ...(payload.generationId ? { generationId: payload.generationId } : {}),
+      }
+      this.pending = this.pending.filter(
+        (p) => !(p.taskId === job.taskId && p.kind === job.kind && p.verificationId === job.verificationId && p.generationId === job.generationId),
+      )
       this.running++
       this.runningByOwner.set(job.ownerId, (this.runningByOwner.get(job.ownerId) ?? 0) + 1)
       void this.runJob(job)
-        .catch(() => {})
+        .then(() => this.db.finishJob(claimed.id, 'done'))
+        .catch((err) => this.db.finishJob(claimed.id, 'failed', err instanceof Error ? err.message : String(err)))
         .finally(() => {
           this.running--
           const left = (this.runningByOwner.get(job.ownerId) ?? 1) - 1
@@ -156,6 +229,17 @@ export class CaptureQueue {
           else this.runningByOwner.set(job.ownerId, left)
           void this.pump()
         })
+    }
+  }
+
+  /** dead instances leave running jobs behind: requeue them after 30 min */
+  private requeueStale(): void {
+    try {
+      const n = this.db.requeueStaleJobs(30 * 60_000)
+      if (n > 0) console.log(`[queue] requeued ${n} stale job(s) from other instances`)
+      void this.pump().catch(() => {})
+    } catch (err) {
+      console.error(`[queue] stale requeue failed: ${String(err)}`)
     }
   }
 

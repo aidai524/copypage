@@ -109,7 +109,7 @@ decide(loop, metrics)           # pass / continue / escalate / stagnant-stop / c
 | 审核 | 域名封禁(含子域)在捕获入口拦截;用户暂停即全站 403 |
 | 审计 | 注册、登录、令牌、封禁、配额、删除写入 `audit_log` |
 
-状态存 SQLite(`node:sqlite`,`dataDir/copypage.db`,WAL),产物仍在 `dataDir/tasks/<id>/`。
+状态存 SQLite(`node:sqlite`,`dataDir/copypage.db`,WAL;多实例共享同一数据目录),产物仍在 `dataDir/tasks/<id>/`。
 
 ### 认证与管理接口
 
@@ -139,6 +139,28 @@ API 进程 ──enqueue──▶ 队列(全局并发 + 每租户并发)
 - 每任务一个 worker 进程:崩溃不影响 API,内存有上限,超时 SIGTERM→SIGKILL
 - worker 不碰数据库,状态统一由调度器落库;重启后一致
 - 容器化隔离(每租户独立容器/网络)只需把 `queue.ts` 的 spawn 换成 `docker run`,接口不变
+
+## 横向扩展(多实例)
+
+任务队列落库(`jobs` 表),任何实例都能**原子认领**,每个任务只跑一次:
+
+- 认领:事务内 `SELECT ... ORDER BY created_at LIMIT 1` + 条件更新;支持按租户排除(已达并发上限的 owner)
+- 故障恢复:运行中任务若所在实例死亡,`requeueStaleJobs(30min)` 自动放回队列,由其它实例接手
+- SSE:除本进程事件外每 2s 轮询数据库变更(`updated_at > since`),因此实例 A 创建的任务在实例 B 的 UI 上也会实时更新
+- 已通过测试:同一数据目录跑两个实例 —— 任务互斥认领、跨实例 SSE 完成事件、队列行终态一致
+
+```bash
+# 同一台机器(共享磁盘,SQLite WAL):
+COPYPAGE_WORKER_CONCURRENCY=2 npx tsx packages/server/src/cli.ts --port 4401 --data-dir /srv/copypage &
+COPYPAGE_WORKER_CONCURRENCY=2 npx tsx packages/server/src/cli.ts --port 4402 --data-dir /srv/copypage &
+# 前置 Caddy/nginx 负载均衡, 各实例加 --trust-proxy
+```
+
+**跨主机部署**还需要三件事(接口已就绪,尚未实现):
+
+1. `Db` 接口已在 `db.ts` 抽出;需将其方法改为异步并提供 **Postgres 适配器**(`DATABASE_URL` 选择)。当前 SQLite 后端是同步 API,直接塞 `pg` 会出现同步/异步不匹配,必须整体 async 化
+2. 产物目录改为共享存储(NFS)或对象存储(S3)适配,否则各主机看不到彼此的截图/DOM
+3. 会话/限流为无状态(已在数据库),无需改动
 
 ## 自动生成
 

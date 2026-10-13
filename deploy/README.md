@@ -158,6 +158,8 @@ scrape_configs:
 
 内置告警规则(每 60s 评估,30 分钟内去重,写审计并邮件通知):队列积压 ≥10、近窗口失败率 ≥50%(样本 ≥5)、磁盘 ≥85%。`COPYPAGE_LOG_FORMAT=json` 可直接对接日志采集。
 
+**横向扩展**:同一数据目录可跑多个实例(任务队列已落库、原子认领,SSE 跨实例轮询),前面挂负载均衡即可;跨主机需要 Postgres 适配 + 共享产物存储,详见 `packages/server/README.md` 的「横向扩展」。
+
 **容器沙箱**:`COPYPAGE_SANDBOX=docker` 后每个任务在独立容器里执行(内存/CPU/pids 限制、只读 /app、可写 /data、独立网络),API 进程被击穿不影响宿主:
 
 ```bash

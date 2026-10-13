@@ -33,7 +33,7 @@ const verifySpec: VerifyJobSpec = {
 
 describe('mapSpecPaths', () => {
   it('rewrites dataDir and repoRoot prefixes to container mounts', () => {
-    const mapped = mapSpecPaths(captureSpec, { dataDir: DATA_DIR, repoRoot: REPO_ROOT })
+    const mapped = mapSpecPaths(captureSpec, { dataDir: DATA_DIR, repoRoot: REPO_ROOT }) as CaptureJobSpec
     expect(mapped.snapshotDir).toBe('/data/tasks/20260101-000000-abc/orig')
     expect(mapped.input.source).toBe('https://example.com')
   })
