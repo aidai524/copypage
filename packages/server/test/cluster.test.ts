@@ -28,8 +28,8 @@ describe('job claiming (shared database)', () => {
     dbA.db.exec('DELETE FROM jobs')
   })
 
-  it('claims a queued job exactly once', () => {
-    dbA.enqueueJob({
+  it('claims a queued job exactly once', async () => {
+    await dbA.enqueueJob({
       id: 'job-1',
       kind: 'capture',
       task_id: 'task-1',
@@ -43,17 +43,17 @@ describe('job claiming (shared database)', () => {
       finished_at: null,
     })
 
-    const first = dbA.claimJob('instance-a')
-    const second = dbB.claimJob('instance-b')
+    const first = await dbA.claimJob('instance-a')
+    const second = await dbB.claimJob('instance-b')
     expect(first?.id).toBe('job-1')
     expect(first?.instance_id).toBe('instance-a')
     expect(second).toBeUndefined()
-    dbA.finishJob('job-1', 'done')
+    await dbA.finishJob('job-1', 'done')
   })
 
-  it('honors per-tenant exclusions when claiming', () => {
+  it('honors per-tenant exclusions when claiming', async () => {
     for (const id of ['job-a', 'job-b']) {
-      dbA.enqueueJob({
+      await dbA.enqueueJob({
         id,
         kind: 'capture',
         task_id: `task-${id}`,
@@ -67,13 +67,13 @@ describe('job claiming (shared database)', () => {
         finished_at: null,
       })
     }
-    const claimed = dbA.claimJob('instance-a', ['busy'])
+    const claimed = await dbA.claimJob('instance-a', ['busy'])
     expect(claimed?.owner_id).toBe('free')
-    dbA.finishJob(claimed!.id, 'done')
+    await dbA.finishJob(claimed!.id, 'done')
   })
 
-  it('requeues jobs whose instance died mid-run', () => {
-    dbA.enqueueJob({
+  it('requeues jobs whose instance died mid-run', async () => {
+    await dbA.enqueueJob({
       id: 'job-stale',
       kind: 'verify',
       task_id: 'task-stale',
@@ -86,16 +86,16 @@ describe('job claiming (shared database)', () => {
       started_at: null,
       finished_at: null,
     })
-    const claimed = dbB.claimJob('dead-instance')
+    const claimed = await dbB.claimJob('dead-instance')
     expect(claimed?.id).toBe('job-stale')
     // pretend the instance hung 40 minutes ago
     dbB.db
       .prepare('UPDATE jobs SET started_at = ? WHERE id = ?')
       .run(new Date(Date.now() - 40 * 60_000).toISOString(), 'job-stale')
-    expect(dbA.requeueStaleJobs(30 * 60_000)).toBe(1)
-    const reclaimed = dbA.claimJob('instance-a')
+    expect(await dbA.requeueStaleJobs(30 * 60_000)).toBe(1)
+    const reclaimed = await dbA.claimJob('instance-a')
     expect(reclaimed?.id).toBe('job-stale')
-    dbA.finishJob('job-stale', 'done')
+    await dbA.finishJob('job-stale', 'done')
   })
 })
 
@@ -177,7 +177,7 @@ describe('two instances over one data directory', () => {
     }
 
     // the queue row is finished, not stuck in running
-    const job = a.db.listJobs().find((j) => j.task_id === task.id)
+    const job = (await a.db.listJobs()).find((j) => j.task_id === task.id)
     expect(job?.status).toBe('done')
   }, 180_000)
 })

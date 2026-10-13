@@ -22,14 +22,14 @@ export async function importLegacyTasks(dataDir: string, db: Db): Promise<number
   let imported = 0
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    if (db.getTask(entry.name)) continue
+    if (await db.getTask(entry.name)) continue
     const file = path.join(tasksRoot, entry.name, 'task.json')
     const legacy = await readFile(file, 'utf8')
       .then((raw) => JSON.parse(raw) as Partial<Task>)
       .catch(() => null)
     if (!legacy?.id || !legacy.input) continue
     const now = new Date().toISOString()
-    db.insertTask({
+    await db.insertTask({
       id: legacy.id,
       owner_id: legacy.ownerId ?? 'system',
       status: legacy.status ?? 'done',
@@ -120,8 +120,8 @@ export class TaskStore {
     }
   }
 
-  private persist(task: Task): void {
-    this.db.updateTask(task.id, {
+  private async persist(task: Task): Promise<void> {
+    await this.db.updateTask(task.id, {
       status: task.status,
       progress_json: JSON.stringify(task.progress),
       loop_json: JSON.stringify(task.loop),
@@ -135,16 +135,16 @@ export class TaskStore {
     })
   }
 
-  get(id: string): Task | undefined {
-    const row = this.db.getTask(id)
+  async get(id: string): Promise<Task | undefined> {
+    const row = await this.db.getTask(id)
     return row ? this.toTask(row) : undefined
   }
 
-  list(ownerId?: string, limit = 500): Task[] {
-    return this.db.listTasks(ownerId, limit).map((row) => this.toTask(row))
+  async list(ownerId?: string, limit = 500): Promise<Task[]> {
+    return (await this.db.listTasks(ownerId, limit)).map((row) => this.toTask(row))
   }
 
-  count(ownerId?: string): number {
+  async count(ownerId?: string): Promise<number> {
     return this.db.countTasks(ownerId)
   }
 
@@ -165,7 +165,7 @@ export class TaskStore {
       sizeBytes: 0,
     }
     await mkdir(this.taskDir(task.id), { recursive: true })
-    this.db.insertTask({
+    await this.db.insertTask({
       id: task.id,
       owner_id: task.ownerId,
       status: task.status,
@@ -187,29 +187,29 @@ export class TaskStore {
   }
 
   async update(id: string, patch: Partial<Task>): Promise<Task> {
-    const task = this.get(id)
+    const task = await this.get(id)
     if (!task) throw new Error(`unknown task ${id}`)
     Object.assign(task, patch, { updatedAt: new Date().toISOString() })
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
     return task
   }
 
   async appendProgress(id: string, message: string): Promise<void> {
-    const task = this.get(id)
+    const task = await this.get(id)
     if (!task) return
     pushProgress(task.progress, message)
     task.updatedAt = new Date().toISOString()
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
   }
 
   async setSize(id: string, sizeBytes: number): Promise<void> {
-    const task = this.get(id)
+    const task = await this.get(id)
     if (!task) return
     task.sizeBytes = sizeBytes
     task.updatedAt = new Date().toISOString()
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
   }
 
@@ -219,7 +219,7 @@ export class TaskStore {
     reproDir: string,
     opts: { id?: string; round?: number } = {},
   ): Promise<Verification> {
-    const task = this.get(taskId)
+    const task = await this.get(taskId)
     if (!task) throw new Error(`unknown task ${taskId}`)
     const now = new Date().toISOString()
     const verification: Verification = {
@@ -235,7 +235,7 @@ export class TaskStore {
     await mkdir(this.verificationDir(taskId, verification.id), { recursive: true })
     task.verifications.push(verification)
     task.updatedAt = now
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
     return verification
   }
@@ -245,13 +245,13 @@ export class TaskStore {
     verificationId: string,
     patch: Partial<Verification>,
   ): Promise<Verification> {
-    const task = this.get(taskId)
+    const task = await this.get(taskId)
     if (!task) throw new Error(`unknown task ${taskId}`)
     const verification = task.verifications.find((v) => v.id === verificationId)
     if (!verification) throw new Error(`unknown verification ${verificationId}`)
     Object.assign(verification, patch, { updatedAt: new Date().toISOString() })
     task.updatedAt = verification.updatedAt
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
     return verification
   }
@@ -261,13 +261,13 @@ export class TaskStore {
     verificationId: string,
     message: string,
   ): Promise<void> {
-    const task = this.get(taskId)
+    const task = await this.get(taskId)
     const verification = task?.verifications.find((v) => v.id === verificationId)
     if (!task || !verification) return
     pushProgress(verification.progress, message)
     verification.updatedAt = new Date().toISOString()
     task.updatedAt = verification.updatedAt
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
   }
 
@@ -275,7 +275,7 @@ export class TaskStore {
     taskId: string,
     opts: { reproDir: string; sessionId: string; command: string; model?: string },
   ): Promise<Generation> {
-    const task = this.get(taskId)
+    const task = await this.get(taskId)
     if (!task) throw new Error(`unknown task ${taskId}`)
     const now = new Date().toISOString()
     const generation: Generation = {
@@ -292,7 +292,7 @@ export class TaskStore {
     await mkdir(this.generationDir(taskId, generation.id), { recursive: true })
     task.generations.push(generation)
     task.updatedAt = now
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
     return generation
   }
@@ -302,13 +302,13 @@ export class TaskStore {
     generationId: string,
     patch: Partial<Generation>,
   ): Promise<Generation> {
-    const task = this.get(taskId)
+    const task = await this.get(taskId)
     if (!task) throw new Error(`unknown task ${taskId}`)
     const generation = task.generations.find((g) => g.id === generationId)
     if (!generation) throw new Error(`unknown generation ${generationId}`)
     Object.assign(generation, patch, { updatedAt: new Date().toISOString() })
     task.updatedAt = generation.updatedAt
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
     return generation
   }
@@ -318,23 +318,23 @@ export class TaskStore {
     generationId: string,
     message: string,
   ): Promise<void> {
-    const task = this.get(taskId)
+    const task = await this.get(taskId)
     const generation = task?.generations.find((g) => g.id === generationId)
     if (!task || !generation) return
     pushProgress(generation.progress, message)
     generation.updatedAt = new Date().toISOString()
     task.updatedAt = generation.updatedAt
-    this.persist(task)
+    await this.persist(task)
     this.emit(task)
   }
 
   /** delete a task: artifacts on disk + database row */
   async delete(id: string): Promise<boolean> {
-    const task = this.get(id)
+    const task = await this.get(id)
     if (!task) return false
     await rm(this.taskDir(id), { recursive: true, force: true }).catch(() => {})
-    this.db.deleteJobsForTask(id)
-    const removed = this.db.deleteTask(id)
+    await this.db.deleteJobsForTask(id)
+    const removed = await this.db.deleteTask(id)
     if (removed) this.events.emit('cleaned', [id])
     return removed
   }
@@ -342,11 +342,12 @@ export class TaskStore {
   /** retention sweep: delete finished tasks older than maxAgeMs */
   async cleanupOlderThan(maxAgeMs: number): Promise<string[]> {
     const cutoff = new Date(Date.now() - maxAgeMs).toISOString()
-    const ids = this.db.expiredTaskIds(cutoff)
+    const ids = await this.db.expiredTaskIds(cutoff)
     const removed: string[] = []
     for (const id of ids) {
       await rm(this.taskDir(id), { recursive: true, force: true }).catch(() => {})
-      if (this.db.deleteTask(id)) removed.push(id)
+      await this.db.deleteJobsForTask(id)
+      if (await this.db.deleteTask(id)) removed.push(id)
     }
     if (removed.length > 0) this.events.emit('cleaned', removed)
     return removed

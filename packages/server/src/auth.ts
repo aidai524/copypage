@@ -44,16 +44,20 @@ export function newId(): string {
 }
 
 /** Create a login session; returns the plaintext token for the cookie. */
-export function createSession(db: Db, userId: string, ttlMs = SESSION_TTL_MS): string {
+export async function createSession(db: Db, userId: string, ttlMs = SESSION_TTL_MS): Promise<string> {
   const token = newToken()
-  db.createSession(tokenHash(token), userId, new Date(Date.now() + ttlMs).toISOString())
+  await db.createSession(tokenHash(token), userId, new Date(Date.now() + ttlMs).toISOString())
   return token
 }
 
-export function createApiToken(db: Db, userId: string, name: string | null): { id: string; token: string } {
+export async function createApiToken(
+  db: Db,
+  userId: string,
+  name: string | null,
+): Promise<{ id: string; token: string }> {
   const id = randomUUID()
   const token = `cp_${newToken()}`
-  db.createApiToken({ id, user_id: userId, name, token_hash: tokenHash(token) })
+  await db.createApiToken({ id, user_id: userId, name, token_hash: tokenHash(token) })
   return { id, token }
 }
 
@@ -94,11 +98,15 @@ function toIdentity(user: UserRow, legacy = false): Identity {
  * Resolve the caller: session cookie → API token → legacy shared token.
  * Returns null when nothing matches (caller decides 401 vs open mode).
  */
-export function authenticate(req: IncomingMessage, db: Db, config: ServerConfig): Identity | null {
+export async function authenticate(
+  req: IncomingMessage,
+  db: Db,
+  config: ServerConfig,
+): Promise<Identity | null> {
   const cookies = parseCookies(req.headers.cookie)
   const sessionToken = cookies[SESSION_COOKIE]
   if (sessionToken) {
-    const user = db.getUserBySessionHash(tokenHash(sessionToken))
+    const user = await db.getUserBySessionHash(tokenHash(sessionToken))
     if (user) return toIdentity(user)
   }
 
@@ -114,7 +122,7 @@ export function authenticate(req: IncomingMessage, db: Db, config: ServerConfig)
   }
   const provided = bearer ?? apiKey ?? queryToken
   if (provided) {
-    const user = db.getUserByApiTokenHash(tokenHash(provided))
+    const user = await db.getUserByApiTokenHash(tokenHash(provided))
     if (user) return toIdentity(user)
     if (config.token && provided === config.token) {
       // legacy single-tenant token: acts as the system administrator
@@ -133,20 +141,20 @@ export function authenticate(req: IncomingMessage, db: Db, config: ServerConfig)
 }
 
 /** True when the server has any real auth configured (multi-tenant mode). */
-export function authRequired(db: Db, config: ServerConfig): boolean {
-  return Boolean(config.token) || Boolean(config.adminEmail) || db.countUsers() > 0
+export async function authRequired(db: Db, config: ServerConfig): Promise<boolean> {
+  return Boolean(config.token) || Boolean(config.adminEmail) || (await db.countUsers()) > 0
 }
 
 /** Create the bootstrap admin from config if it does not exist yet. */
-export function ensureBootstrapAdmin(db: Db, config: ServerConfig): UserRow | undefined {
+export async function ensureBootstrapAdmin(db: Db, config: ServerConfig): Promise<UserRow | undefined> {
   if (!config.adminEmail || !config.adminPassword) return undefined
   const email = config.adminEmail.toLowerCase()
-  const existing = db.getUserByEmail(email)
+  const existing = await db.getUserByEmail(email)
   if (existing) {
-    if (existing.role !== 'admin') db.updateUser(existing.id, { role: 'admin' })
+    if (existing.role !== 'admin') await db.updateUser(existing.id, { role: 'admin' })
     return db.getUserByEmail(email)
   }
-  const user = db.createUser({
+  const user = await db.createUser({
     id: randomUUID(),
     email,
     name: 'admin',
@@ -157,6 +165,6 @@ export function ensureBootstrapAdmin(db: Db, config: ServerConfig): UserRow | un
     quota_json: '{}',
     email_verified: 1,
   })
-  db.audit(null, 'admin.bootstrap', { email })
+  await db.audit(null, 'admin.bootstrap', { email })
   return user
 }

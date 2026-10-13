@@ -85,21 +85,23 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
       window.count++
       if (window.count < 3) return
       const summary = `最近 30 分钟连续 ${window.count} 次任务失败,最后一次(${kind}, ${taskId}): ${error.slice(0, 180)}`
-      const result = warnUser(db, ownerId, 'repeated_failures', summary)
-      if (result.created && config.adminAlertEmail) {
-        void email.send(
-          alertEmail(config.adminAlertEmail, '租户连续任务失败', [
-            `用户: ${ownerId}`,
-            `次数: ${window.count} / 30 分钟`,
-            `最后错误: ${error.slice(0, 300)}`,
-          ]),
-        ).catch(() => {})
-      }
+      void warnUser(db, ownerId, 'repeated_failures', summary).then((result) => {
+        if (!result.created || !config.adminAlertEmail) return
+        void email
+          .send(
+            alertEmail(config.adminAlertEmail, '租户连续任务失败', [
+              `用户: ${ownerId}`,
+              `次数: ${window.count} / 30 分钟`,
+              `最后错误: ${error.slice(0, 300)}`,
+            ]),
+          )
+          .catch(() => {})
+      })
     },
   })
 
-  const authRequired = () =>
-    Boolean(config.token) || Boolean(config.adminEmail) || db.countUsers() > 0
+  const authRequired = async () =>
+    Boolean(config.token) || Boolean(config.adminEmail) || (await db.countUsers()) > 0
 
   const server = createApiServer({ store, queue, db, config, publicDir, authRequired, email, metrics })
 
@@ -118,14 +120,16 @@ export async function startServer(opts: StartServerOptions = {}): Promise<Runnin
 
   // gauge refresh (queue depth, task states, users, storage)
   const gaugeTimer = setInterval(() => {
-    const tasks = store.list()
-    metrics.gauge('copypage_queue_depth', queue.size, 'queued + running jobs')
-    for (const status of ['queued', 'running', 'done', 'failed']) {
-      metrics.gauge(`copypage_tasks_${status}`, tasks.filter((t) => t.status === status).length)
-    }
-    metrics.gauge('copypage_users_total', db.countUsers())
-    metrics.gauge('copypage_storage_bytes', db.sumStorage())
-    metrics.gauge('copypage_warnings_total', db.listWarnings(undefined, 1000).length)
+    void (async () => {
+      const tasks = await store.list()
+      metrics.gauge('copypage_queue_depth', queue.size, 'queued + running jobs')
+      for (const status of ['queued', 'running', 'done', 'failed']) {
+        metrics.gauge(`copypage_tasks_${status}`, tasks.filter((t) => t.status === status).length)
+      }
+      metrics.gauge('copypage_users_total', await db.countUsers())
+      metrics.gauge('copypage_storage_bytes', await db.sumStorage())
+      metrics.gauge('copypage_warnings_total', (await db.listWarnings(undefined, 1000)).length)
+    })().catch(() => {})
   }, 30_000)
   gaugeTimer.unref()
 

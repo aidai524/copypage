@@ -126,7 +126,7 @@ export interface ApiDeps {
   config: ServerConfig
   publicDir: string
   /** true once any real auth exists (token, admin or registered users) */
-  authRequired: () => boolean
+  authRequired: () => Promise<boolean>
   /** mail transport (Resend when configured, stdout otherwise) */
   email: EmailClient
   metrics: Metrics
@@ -134,7 +134,7 @@ export interface ApiDeps {
 
 export function createApiServer({ store, queue, db, config, publicDir, authRequired, email, metrics }: ApiDeps) {
   // bootstrap admin so the first login works
-  ensureBootstrapAdmin(db, config)
+  void ensureBootstrapAdmin(db, config)
 
   const buckets = new Map<string, { tokens: number; resetAt: number }>()
 
@@ -222,10 +222,10 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
   }
 
   /** create a one-time email token (invalidating older ones of the same kind) */
-  function issueEmailToken(userId: string, kind: 'verify_email' | 'reset_password', ttlMs: number): string {
+  async function issueEmailToken(userId: string, kind: 'verify_email' | 'reset_password', ttlMs: number): Promise<string> {
     const token = newToken()
-    db.deleteEmailTokens(userId, kind)
-    db.createEmailToken({
+    await db.deleteEmailTokens(userId, kind)
+    await db.createEmailToken({
       id: newId(),
       user_id: userId,
       kind,
@@ -236,30 +236,30 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
   }
 
   async function sendVerificationEmail(user: UserRow): Promise<void> {
-    const token = issueEmailToken(user.id, 'verify_email', 24 * 3600_000)
+    const token = await issueEmailToken(user.id, 'verify_email', 24 * 3600_000)
     try {
       await email.send(verificationEmail(config, user.email, token))
     } catch (err) {
       console.error(`[email] verification send failed for ${user.email}: ${String(err)}`)
-      db.audit(null, 'email.send_failed', { kind: 'verify_email', email: user.email })
+      await db.audit(null, 'email.send_failed', { kind: 'verify_email', email: user.email })
     }
   }
 
   async function sendResetEmail(user: UserRow): Promise<void> {
-    const token = issueEmailToken(user.id, 'reset_password', 3600_000)
+    const token = await issueEmailToken(user.id, 'reset_password', 3600_000)
     try {
       await email.send(resetEmail(config, user.email, token))
     } catch (err) {
       console.error(`[email] reset send failed for ${user.email}: ${String(err)}`)
-      db.audit(null, 'email.send_failed', { kind: 'reset_password', email: user.email })
+      await db.audit(null, 'email.send_failed', { kind: 'reset_password', email: user.email })
     }
   }
 
   /** warn a tenant: in-app warning + optional email (never throws) */
   async function notifyUser(userId: string, kind: WarningKind, message: string): Promise<void> {
-    const result = warnUser(db, userId, kind, message)
+    const result = await warnUser(db, userId, kind, message)
     if (!result.created) return
-    const user = db.getUserById(userId)
+    const user = await db.getUserById(userId)
     if (!user || !user.email_verified) return
     try {
       await email.send(warningEmail(user.email, message))
@@ -270,7 +270,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
   /** notify the operator about abuse signals (best effort, never throws) */
   async function alertAdmin(title: string, lines: string[]): Promise<void> {
-    db.audit(null, 'alert', { title, lines })
+    await db.audit(null, 'alert', { title, lines })
     if (!config.adminAlertEmail) return
     try {
       await email.send(alertEmail(config.adminAlertEmail, title, lines))
@@ -291,13 +291,13 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     }
   }
 
-  function mePayload(identity: Identity) {
-    const warnings = identity.legacy ? [] : db.listWarnings(identity.userId, 20)
+  async function mePayload(identity: Identity) {
+    const warnings = identity.legacy ? [] : await db.listWarnings(identity.userId, 20)
     return {
       user: identityPublic(identity),
-      quota: resolveQuotaForOwner(db, identity.userId, config),
-      usage: db.getUsage(identity.userId, today()),
-      totals: quotaUsage(db, identity.userId),
+      quota: await resolveQuotaForOwner(db, identity.userId, config),
+      usage: await db.getUsage(identity.userId, today()),
+      totals: await quotaUsage(db, identity.userId),
       warnings,
     }
   }
@@ -321,7 +321,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     if (pathname === '/metrics' && req.method === 'GET') {
       const remote = (req.socket.remoteAddress ?? '').replace('::ffff:', '')
       const loopback = remote === '127.0.0.1' || remote === '::1'
-      const scrapeIdentity = authenticate(req, db, config)
+      const scrapeIdentity = await authenticate(req, db, config)
       if (!config.metricsOpen && !loopback && scrapeIdentity?.role !== 'admin') {
         json(res, 401, { error: 'unauthorized' })
         return
@@ -331,8 +331,8 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       return
     }
 
-    const identity = authenticate(req, db, config)
-    const authOn = authRequired()
+    const identity = await authenticate(req, db, config)
+    const authOn = await authRequired()
     // open single-tenant mode: no token/admin/users configured
     const effective: Identity = identity ?? {
       userId: 'system',
@@ -356,13 +356,13 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     }
 
     if (identity && identity.status === 'suspended' && !identity.legacy && !pathname.startsWith('/api/auth/')) {
-      warnUser(db, identity.userId, 'account_suspended', '账号已被暂停,请联系管理员', { dedupeHours: 72 })
+      await warnUser(db, identity.userId, 'account_suspended', '账号已被暂停,请联系管理员', { dedupeHours: 72 })
       json(res, 403, { error: 'account suspended' })
       return
     }
 
     if (identity && !identity.legacy && config.requireEmailVerification && !pathname.startsWith('/api/auth/')) {
-      const user = db.getUserById(identity.userId)
+      const user = await db.getUserById(identity.userId)
       if (user && !user.email_verified) {
         json(res, 403, { error: 'email not verified', code: 'email_unverified' })
         return
@@ -374,7 +374,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     if (pathname === '/api/health') {
       const base = { ok: true }
       if (identity || !authOn) {
-        json(res, 200, { ...base, tasks: store.count(), queue: queue.size, authRequired: authOn })
+        json(res, 200, { ...base, tasks: await store.count(), queue: queue.size, authRequired: authOn })
       } else {
         json(res, 200, base)
       }
@@ -406,12 +406,12 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       // by another API/worker instance also reach this stream
       const scope = effective.role === 'admin' ? undefined : effective.userId
       let since = new Date().toISOString()
-      const poll = setInterval(() => {
+      const poll = setInterval(async () => {
         try {
-          const rows = db.listTasksUpdatedSince(scope, since, 100)
+          const rows = await db.listTasksUpdatedSince(scope, since, 100)
           for (const row of rows) {
             since = row.updated_at > since ? row.updated_at : since
-            const task = store.get(row.id)
+            const task = await store.get(row.id)
             if (!task) continue
             if (effective.role !== 'admin' && task.ownerId !== effective.userId) continue
             res.write(`event: task\ndata: ${JSON.stringify(task)}\n\n`)
@@ -457,11 +457,11 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 400, { error: 'password must be at least 8 characters' })
         return
       }
-      if (db.getUserByEmail(email)) {
+      if (await db.getUserByEmail(email)) {
         json(res, 409, { error: 'email already registered' })
         return
       }
-      const user = db.createUser({
+      const user = await db.createUser({
         id: newId(),
         email,
         name,
@@ -473,8 +473,8 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         email_verified: config.requireEmailVerification ? 0 : 1,
       })
       if (config.requireEmailVerification) await sendVerificationEmail(user)
-      const token = createSession(db, user.id)
-      db.audit(user.id, 'user.register', { email, verificationSent: config.requireEmailVerification })
+      const token = await createSession(db, user.id)
+      await db.audit(user.id, 'user.register', { email, verificationSent: config.requireEmailVerification })
       json(
         res,
         201,
@@ -494,7 +494,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       }
       const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
       const password = typeof body.password === 'string' ? body.password : ''
-      const user = db.getUserByEmail(email)
+      const user = await db.getUserByEmail(email)
       if (!user || !verifyPassword(password, user.password_hash)) {
         json(res, 401, { error: 'invalid email or password' })
         return
@@ -503,7 +503,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 403, { error: 'account suspended' })
         return
       }
-      const token = createSession(db, user.id)
+      const token = await createSession(db, user.id)
       json(res, 200, { user: userPublic(user) }, { 'set-cookie': sessionCookie(token) })
       return
     }
@@ -517,14 +517,14 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         return
       }
       const token = typeof body.token === 'string' ? body.token : ''
-      const row = token ? db.getEmailToken(tokenHash(token)) : undefined
+      const row = token ? await db.getEmailToken(tokenHash(token)) : undefined
       if (!row || row.kind !== 'verify_email') {
         json(res, 400, { error: 'invalid or expired verification token' })
         return
       }
-      db.useEmailToken(row.id)
-      db.setEmailVerified(row.user_id)
-      db.audit(row.user_id, 'user.email_verified', {})
+      await db.useEmailToken(row.id)
+      await db.setEmailVerified(row.user_id)
+      await db.audit(row.user_id, 'user.email_verified', {})
       json(res, 200, { ok: true })
       return
     }
@@ -538,7 +538,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         return
       }
       const emailAddress = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-      const user = emailAddress ? db.getUserByEmail(emailAddress) : undefined
+      const user = emailAddress ? await db.getUserByEmail(emailAddress) : undefined
       if (user && !user.email_verified) await sendVerificationEmail(user)
       // never reveal whether the account exists
       json(res, 200, { ok: true })
@@ -554,7 +554,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         return
       }
       const emailAddress = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-      const user = emailAddress ? db.getUserByEmail(emailAddress) : undefined
+      const user = emailAddress ? await db.getUserByEmail(emailAddress) : undefined
       if (user) await sendResetEmail(user)
       json(res, 200, { ok: true })
       return
@@ -574,15 +574,15 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 400, { error: 'password must be at least 8 characters' })
         return
       }
-      const row = token ? db.getEmailToken(tokenHash(token)) : undefined
+      const row = token ? await db.getEmailToken(tokenHash(token)) : undefined
       if (!row || row.kind !== 'reset_password') {
         json(res, 400, { error: 'invalid or expired reset token' })
         return
       }
-      db.useEmailToken(row.id)
-      db.updateUser(row.user_id, { password_hash: hashPassword(password) })
-      db.deleteUserSessions(row.user_id) // force re-login everywhere
-      db.audit(row.user_id, 'user.password_reset', {})
+      await db.useEmailToken(row.id)
+      await db.updateUser(row.user_id, { password_hash: hashPassword(password) })
+      await db.deleteUserSessions(row.user_id) // force re-login everywhere
+      await db.audit(row.user_id, 'user.password_reset', {})
       json(res, 200, { ok: true })
       return
     }
@@ -590,20 +590,20 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     if (pathname === '/api/auth/logout' && req.method === 'POST') {
       const cookies = req.headers.cookie ?? ''
       const match = cookies.match(/(?:^|;\s*)cp_session=([^;]+)/)
-      if (match) db.deleteSession(tokenHash(match[1]))
+      if (match) await db.deleteSession(tokenHash(match[1]))
       json(res, 200, { ok: true }, { 'set-cookie': clearSessionCookie() })
       return
     }
 
     if (pathname === '/api/auth/me' && req.method === 'GET') {
-      json(res, 200, mePayload(effective))
+      json(res, 200, await mePayload(effective))
       return
     }
 
     // ---------- api tokens ----------
 
     if (pathname === '/api/tokens' && req.method === 'GET') {
-      json(res, 200, { tokens: db.listApiTokens(effective.userId) })
+      json(res, 200, { tokens: await db.listApiTokens(effective.userId) })
       return
     }
 
@@ -615,16 +615,16 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       } catch {
         // body optional
       }
-      const created = createApiToken(db, effective.userId, name)
-      db.audit(effective.userId, 'token.create', { id: created.id })
+      const created = await createApiToken(db, effective.userId, name)
+      await db.audit(effective.userId, 'token.create', { id: created.id })
       json(res, 201, { id: created.id, token: created.token })
       return
     }
 
     const tokenDelete = pathname.match(/^\/api\/tokens\/([^/]+)$/)
     if (tokenDelete && req.method === 'DELETE') {
-      const removed = db.deleteApiToken(effective.userId, tokenDelete[1])
-      db.audit(effective.userId, 'token.delete', { id: tokenDelete[1] })
+      const removed = await db.deleteApiToken(effective.userId, tokenDelete[1])
+      await db.audit(effective.userId, 'token.delete', { id: tokenDelete[1] })
       json(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'unknown token' })
       return
     }
@@ -632,13 +632,13 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     // ---------- warnings ----------
 
     if (pathname === '/api/warnings' && req.method === 'GET') {
-      json(res, 200, { warnings: db.listWarnings(effective.userId, 50) })
+      json(res, 200, { warnings: await db.listWarnings(effective.userId, 50) })
       return
     }
 
     const warningAck = pathname.match(/^\/api\/warnings\/([^/]+)\/ack$/)
     if (warningAck && req.method === 'POST') {
-      const ok = db.acknowledgeWarning(effective.userId, warningAck[1])
+      const ok = await db.acknowledgeWarning(effective.userId, warningAck[1])
       json(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'unknown warning' })
       return
     }
@@ -658,7 +658,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
     if (pathname === '/api/tasks' && req.method === 'GET') {
       const scope = effective.role === 'admin' ? undefined : effective.userId
-      json(res, 200, { tasks: store.list(scope), queue: queue.size })
+      json(res, 200, { tasks: await store.list(scope), queue: queue.size })
       return
     }
 
@@ -677,15 +677,15 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 400, { error: 'type must be url|image|video and source must be non-empty' })
         return
       }
-      const quota = checkQuota(db, effective, 'capture', config)
+      const quota = await checkQuota(db, effective, 'capture', config)
       if (!quota.ok) {
         if (!effective.legacy) void notifyUser(effective.userId, 'quota', quota.message)
         json(res, 403, { error: quota.message, code: quota.code, quota: quota.quota, usage: quota.usage })
         return
       }
       if (!effective.legacy) {
-        maybeQuotaWarning(db, effective.userId, 'capture', quota.usage.tasks, quota.quota.maxTasks, '任务数')
-        maybeQuotaWarning(
+        await maybeQuotaWarning(db, effective.userId, 'capture', quota.usage.tasks, quota.quota.maxTasks, '任务数')
+        await maybeQuotaWarning(
           db,
           effective.userId,
           'storage',
@@ -694,7 +694,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
           '存储',
         )
       }
-      if (store.count() >= config.maxTasks) {
+      if (await store.count() >= config.maxTasks) {
         json(res, 507, { error: `server task limit reached (${config.maxTasks})` })
         return
       }
@@ -706,7 +706,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
           return
         }
         const host = new URL(source).hostname
-        if (db.isDomainBlocked(host)) {
+        if (await db.isDomainBlocked(host)) {
           if (!effective.legacy) {
             void notifyUser(effective.userId, 'blocked_domain', `目标站点已被平台封禁: ${host}`)
           }
@@ -720,7 +720,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         }
       }
       const task = await store.create(effective.userId, { type, source }, sanitizeOptions(input.options))
-      if (!effective.legacy) db.incrUsage(effective.userId, 'capture', today())
+      if (!effective.legacy) await db.incrUsage(effective.userId, 'capture', today())
       queue.enqueue({ kind: 'capture', taskId: task.id, ownerId: effective.userId })
       json(res, 201, { task })
       return
@@ -728,7 +728,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
     const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/)
     if (taskMatch && req.method === 'GET') {
-      const task = store.get(taskMatch[1])
+      const task = await store.get(taskMatch[1])
       if (!task || !ownsTask(effective, task.ownerId)) {
         json(res, 404, { error: 'unknown task' })
         return
@@ -738,7 +738,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     }
 
     if (taskMatch && req.method === 'DELETE') {
-      const task = store.get(taskMatch[1])
+      const task = await store.get(taskMatch[1])
       if (!task || !ownsTask(effective, task.ownerId)) {
         json(res, 404, { error: 'unknown task' })
         return
@@ -748,7 +748,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         return
       }
       await store.delete(task.id)
-      db.audit(effective.userId, 'task.delete', { taskId: task.id, owner: task.ownerId })
+      await db.audit(effective.userId, 'task.delete', { taskId: task.id, owner: task.ownerId })
       json(res, 200, { ok: true })
       return
     }
@@ -761,7 +761,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
     const generateMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/generate$/)
     if (generateMatch && req.method === 'POST') {
-      const task = store.get(generateMatch[1])
+      const task = await store.get(generateMatch[1])
       if (!task || !ownsTask(effective, task.ownerId)) {
         json(res, 404, { error: 'unknown task' })
         return
@@ -774,7 +774,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 403, { error: 'agent generation is disabled — start the server with --allow-agent' })
         return
       }
-      const quota = checkQuota(db, effective, 'generate', config)
+      const quota = await checkQuota(db, effective, 'generate', config)
       if (!quota.ok) {
         if (!effective.legacy) void notifyUser(effective.userId, 'quota', quota.message)
         json(res, 403, { error: quota.message, code: quota.code, quota: quota.quota, usage: quota.usage })
@@ -786,15 +786,15 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         command: config.agentCommand,
         ...(config.agentModel ? { model: config.agentModel } : {}),
       })
-      if (!effective.legacy) db.incrUsage(effective.userId, 'generate', today())
+      if (!effective.legacy) await db.incrUsage(effective.userId, 'generate', today())
       queue.enqueue({ kind: 'generate', taskId: task.id, ownerId: task.ownerId, generationId: generation.id })
-      json(res, 201, { task: store.get(task.id), generation })
+      json(res, 201, { task: await store.get(task.id), generation })
       return
     }
 
     const files = pathname.match(/^\/api\/tasks\/([^/]+)\/files\/(.+)$/)
     if (files && req.method === 'GET') {
-      const task = store.get(files[1])
+      const task = await store.get(files[1])
       if (!task || !ownsTask(effective, task.ownerId)) {
         json(res, 404, { error: 'unknown task' })
         return
@@ -805,7 +805,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
     const artifacts = pathname.match(/^\/api\/tasks\/([^/]+)\/artifacts\/(.+)$/)
     if (artifacts && req.method === 'GET') {
-      const task = store.get(artifacts[1])
+      const task = await store.get(artifacts[1])
       if (!task || !ownsTask(effective, task.ownerId)) {
         json(res, 404, { error: 'unknown task' })
         return
@@ -825,7 +825,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     taskId: string,
     identity: Identity,
   ): Promise<void> {
-    const task = store.get(taskId)
+    const task = await store.get(taskId)
     if (!task || !ownsTask(identity, task.ownerId)) {
       json(res, 404, { error: 'unknown task' })
       return
@@ -834,7 +834,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       json(res, 409, { error: 'capture must finish before verifying' })
       return
     }
-    const quota = checkQuota(db, identity, 'verify', config)
+    const quota = await checkQuota(db, identity, 'verify', config)
     if (!quota.ok) {
       if (!identity.legacy) void notifyUser(identity.userId, 'quota', quota.message)
       json(res, 403, { error: quota.message, code: quota.code, quota: quota.quota, usage: quota.usage })
@@ -859,10 +859,10 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 400, { error: message })
         return
       }
-      if (!identity.legacy) db.incrUsage(identity.userId, 'verify', today())
+      if (!identity.legacy) await db.incrUsage(identity.userId, 'verify', today())
       queue.enqueue({ kind: 'verify', taskId, ownerId: task.ownerId, verificationId: verification.id })
-      const latest = store.get(taskId)!.verifications.find((v) => v.id === verification.id) ?? verification
-      json(res, 201, { task: store.get(taskId), verification: latest })
+      const latest = (await store.get(taskId))!.verifications.find((v) => v.id === verification.id) ?? verification
+      json(res, 201, { task: await store.get(taskId), verification: latest })
       return
     }
 
@@ -898,9 +898,9 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       { type: 'path', source: reproDir },
       reproDir,
     )
-    if (!identity.legacy) db.incrUsage(identity.userId, 'verify', today())
+    if (!identity.legacy) await db.incrUsage(identity.userId, 'verify', today())
     queue.enqueue({ kind: 'verify', taskId, ownerId: task.ownerId, verificationId: verification.id })
-    json(res, 201, { task: store.get(taskId), verification })
+    json(res, 201, { task: await store.get(taskId), verification })
   }
 
   // ---------- admin ----------
@@ -913,18 +913,20 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     identity: Identity,
   ): Promise<void> {
     if (pathname === '/api/admin/users' && req.method === 'GET') {
-      const users = db.listUsers().map((user) => ({
-        ...userPublic(user),
-        quota: resolveQuotaForOwner(db, user.id, config),
-        totals: quotaUsage(db, user.id),
-      }))
+      const users = await Promise.all(
+        (await db.listUsers()).map(async (user) => ({
+          ...userPublic(user),
+          quota: await resolveQuotaForOwner(db, user.id, config),
+          totals: await quotaUsage(db, user.id),
+        })),
+      )
       json(res, 200, { users })
       return
     }
 
     const userPatch = pathname.match(/^\/api\/admin\/users\/([^/]+)$/)
     if (userPatch && req.method === 'PATCH') {
-      const user = db.getUserById(userPatch[1])
+      const user = await db.getUserById(userPatch[1])
       if (!user) {
         json(res, 404, { error: 'unknown user' })
         return
@@ -943,14 +945,14 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       if (typeof body.password === 'string' && body.password.length >= 8) {
         patch.password_hash = hashPassword(body.password)
       }
-      const updated = db.updateUser(user.id, patch)
-      db.audit(identity.userId, 'admin.user.update', { userId: user.id, patch: { ...patch, password_hash: undefined } })
+      const updated = await db.updateUser(user.id, patch)
+      await db.audit(identity.userId, 'admin.user.update', { userId: user.id, patch: { ...patch, password_hash: undefined } })
       json(res, 200, { user: updated ? userPublic(updated) : null })
       return
     }
 
     if (pathname === '/api/admin/blocks' && req.method === 'GET') {
-      json(res, 200, { blocks: db.listBlocks() })
+      json(res, 200, { blocks: await db.listBlocks() })
       return
     }
 
@@ -975,28 +977,28 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         note: typeof body.note === 'string' ? body.note.slice(0, 200) : null,
         created_at: new Date().toISOString(),
       }
-      db.addBlock(block)
-      db.audit(identity.userId, 'admin.block.add', block)
+      await db.addBlock(block)
+      await db.audit(identity.userId, 'admin.block.add', block)
       json(res, 201, { block })
       return
     }
 
     const blockDelete = pathname.match(/^\/api\/admin\/blocks\/([^/]+)$/)
     if (blockDelete && req.method === 'DELETE') {
-      const removed = db.removeBlock(blockDelete[1])
-      db.audit(identity.userId, 'admin.block.remove', { id: blockDelete[1] })
+      const removed = await db.removeBlock(blockDelete[1])
+      await db.audit(identity.userId, 'admin.block.remove', { id: blockDelete[1] })
       json(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'unknown block' })
       return
     }
 
     if (pathname === '/api/admin/audit' && req.method === 'GET') {
       const limit = Math.min(Number(url.searchParams.get('limit') ?? '200') || 200, 1000)
-      json(res, 200, { entries: db.listAudit(limit) })
+      json(res, 200, { entries: await db.listAudit(limit) })
       return
     }
 
     if (pathname === '/api/admin/warnings' && req.method === 'GET') {
-      json(res, 200, { warnings: db.listWarnings(undefined, 200) })
+      json(res, 200, { warnings: await db.listWarnings(undefined, 200) })
       return
     }
 
@@ -1014,7 +1016,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 400, { error: 'userId and message required' })
         return
       }
-      if (!db.getUserById(userId)) {
+      if (!await db.getUserById(userId)) {
         json(res, 404, { error: 'unknown user' })
         return
       }
@@ -1025,18 +1027,18 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
     const adminWarningDelete = pathname.match(/^\/api\/admin\/warnings\/([^/]+)$/)
     if (adminWarningDelete && req.method === 'DELETE') {
-      const removed = db.deleteWarning(adminWarningDelete[1])
+      const removed = await db.deleteWarning(adminWarningDelete[1])
       json(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'unknown warning' })
       return
     }
 
     if (pathname === '/api/admin/stats' && req.method === 'GET') {
-      const users = db.listUsers()
+      const users = await db.listUsers()
       json(res, 200, {
         users: users.length,
         suspended: users.filter((u) => u.status === 'suspended').length,
-        tasks: store.count(),
-        storageBytes: db.sumStorage(),
+        tasks: await store.count(),
+        storageBytes: await db.sumStorage(),
         queue: queue.size,
         sessions: users.length ? undefined : 0,
       })

@@ -176,10 +176,10 @@ describe('service security', () => {
     const task = await server.store.create('system', { type: 'url', source: 'https://example.com' })
     await server.store.update(task.id, { status: 'done' })
     // backdate the database row so the retention sweep considers it expired
-    server.db.updateTask(task.id, { updated_at: new Date(Date.now() - 10_000).toISOString() })
+    await server.db.updateTask(task.id, { updated_at: new Date(Date.now() - 10_000).toISOString() })
     const removed = await server.store.cleanupOlderThan(500)
     expect(removed).toContain(task.id)
-    expect(server.store.get(task.id)).toBeUndefined()
+    expect(await server.store.get(task.id)).toBeUndefined()
   })
 
   it('rejects path traversal through the files endpoint', async () => {

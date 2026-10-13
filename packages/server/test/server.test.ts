@@ -121,7 +121,7 @@ describe('capture service', () => {
   }, 120_000)
 
   it('blocks path traversal on artifacts', async () => {
-    const tasks = server.store.list()
+    const tasks = await server.store.list()
     const id = tasks[0].id
     const res = await fetch(
       `${server.url}/api/tasks/${id}/artifacts/${encodeURIComponent('../../task.json')}`,
@@ -130,7 +130,7 @@ describe('capture service', () => {
   })
 
   it('verifies a repro path through the full pipeline', async () => {
-    const task = server.store.list().find((t) => t.status === 'done')!
+    const task = (await server.store.list()).find((t) => t.status === 'done')!
     const res = await fetch(`${server.url}/api/tasks/${task.id}/verifications`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -163,13 +163,13 @@ describe('capture service', () => {
     expect(heat.headers.get('content-type')).toBe('image/png')
 
     // verification runs are persisted on the task and the loop state advanced
-    const reloaded = server.store.get(task.id)!
+    const reloaded = (await server.store.get(task.id))!
     expect(reloaded.loop.round).toBe(done.round)
     expect(reloaded.loop.history).toHaveLength(1)
   }, 120_000)
 
   it('verifies an uploaded zip', async () => {
-    const task = server.store.list().find((t) => t.status === 'done')!
+    const task = (await server.store.list()).find((t) => t.status === 'done')!
     const zip = path.join(dataDir, 'mutated-repro.zip')
     await exec('bsdtar', ['-a', '-cf', zip, '-C', MUTATED_FIXTURE, '.'])
 
@@ -189,7 +189,7 @@ describe('capture service', () => {
   }, 120_000)
 
   it('blocks traversal on the files endpoint', async () => {
-    const task = server.store.list()[0]
+    const task = (await server.store.list())[0]
     const res = await fetch(
       `${server.url}/api/tasks/${task.id}/files/${encodeURIComponent('../../../etc/passwd')}`,
     )
@@ -205,7 +205,7 @@ describe('capture service', () => {
   })
 
   it('refuses agent generation when the server has not opted in', async () => {
-    const task = server.store.list().find((t) => t.status === 'done')!
+    const task = (await server.store.list()).find((t) => t.status === 'done')!
     const res = await fetch(`${server.url}/api/tasks/${task.id}/generate`, { method: 'POST' })
     expect(res.status).toBe(403)
   })

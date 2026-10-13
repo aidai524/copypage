@@ -38,17 +38,17 @@ export function resolveQuota(user: UserRow | undefined, config: ServerConfig): Q
  * Quota for a task owner id. The legacy single-token/system identity always
  * runs unlimited — it is the operator, not a tenant.
  */
-export function resolveQuotaForOwner(db: Db, ownerId: string, config: ServerConfig): Quota {
+export async function resolveQuotaForOwner(db: Db, ownerId: string, config: ServerConfig): Promise<Quota> {
   if (ownerId === 'system') return config.plans.unlimited ?? config.plans.free
-  return resolveQuota(db.getUserById(ownerId), config)
+  return resolveQuota(await db.getUserById(ownerId), config)
 }
 
-export function quotaUsage(db: Db, userId: string): QuotaUsage {
+export async function quotaUsage(db: Db, userId: string): Promise<QuotaUsage> {
   return {
-    tasks: db.countTasks(userId),
-    storageBytes: db.sumStorage(userId),
-    today: db.getUsage(userId, today()),
-    active: db.countActiveTasks(userId),
+    tasks: await db.countTasks(userId),
+    storageBytes: await db.sumStorage(userId),
+    today: await db.getUsage(userId, today()),
+    active: await db.countActiveTasks(userId),
   }
 }
 
@@ -56,10 +56,15 @@ export function quotaUsage(db: Db, userId: string): QuotaUsage {
  * Enforce plan limits before a job is enqueued. Admins and the `unlimited`
  * plan bypass every check.
  */
-export function checkQuota(db: Db, identity: Identity, kind: UsageKind, config: ServerConfig): QuotaCheck {
-  const user = db.getUserById(identity.userId)
+export async function checkQuota(
+  db: Db,
+  identity: Identity,
+  kind: UsageKind,
+  config: ServerConfig,
+): Promise<QuotaCheck> {
+  const user = await db.getUserById(identity.userId)
   const quota = resolveQuota(user, config)
-  const usage = quotaUsage(db, identity.userId)
+  const usage = await quotaUsage(db, identity.userId)
   if (identity.role === 'admin' || identity.plan === 'unlimited' || identity.legacy) {
     return { ok: true, quota, usage }
   }

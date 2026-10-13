@@ -47,12 +47,12 @@ export interface CaptureQueueOptions {
     maxRounds?: number
     timeoutMs?: number
   }
-  /** per-tenant concurrency guard (the API also checks quotas at enqueue) */
-  quotaForOwner?: (ownerId: string) => Quota
   /** metrics registry (optional) */
   metrics?: Metrics
   /** container isolation; when set, jobs run via `docker run` */
   sandbox?: Omit<SandboxOptions, 'dataDir' | 'repoRoot'>
+  /** async quota lookup (database-backed) */
+  quotaForOwner?: (ownerId: string) => Promise<Quota>
   /** failure signal for abuse/quality warnings (never throws back) */
   onJobFailed?: (info: {
     taskId: string
@@ -87,7 +87,7 @@ export class CaptureQueue {
   private memoryMb: number
   private allowBuild: boolean
   private agent: NonNullable<CaptureQueueOptions['agent']>
-  private quotaForOwner: ((ownerId: string) => Quota) | undefined
+  private quotaForOwner: ((ownerId: string) => Promise<Quota>) | undefined
   private onJobFailed: CaptureQueueOptions['onJobFailed']
   private metrics: Metrics | undefined
   private sandbox: Omit<SandboxOptions, 'dataDir' | 'repoRoot'> | undefined
@@ -104,7 +104,9 @@ export class CaptureQueue {
       void this.pump().catch((err) => console.error(`[queue] pump failed: ${String(err)}`))
     }, 2000)
     this.pollTimer.unref()
-    this.requeueTimer = setInterval(() => this.requeueStale(), 60_000)
+    this.requeueTimer = setInterval(() => {
+      void this.requeueStale().catch((err) => console.error(`[queue] stale requeue failed: ${String(err)}`))
+    }, 60_000)
     this.requeueTimer.unref()
     this.repoRoot = opts.repoRoot ?? process.cwd()
     this.workerPath = opts.workerPath ?? path.join(this.repoRoot, 'packages/server/src/worker.ts')
@@ -150,9 +152,15 @@ export class CaptureQueue {
     clearInterval(this.requeueTimer)
   }
 
-  /** queued (shared) + running (this instance) jobs */
+  /** cached queued count (refreshed by the poller) + locally running jobs */
+  private queuedCount = 0
+
   get size(): number {
-    return this.db.countJobs('queued') + this.running
+    return this.queuedCount + this.running
+  }
+
+  private async refreshQueuedCount(): Promise<void> {
+    this.queuedCount = await this.db.countJobs('queued').catch(() => this.queuedCount)
   }
 
   /** persist the job first: another instance may claim it if this one dies */
@@ -178,22 +186,24 @@ export class CaptureQueue {
   }
 
   /** owners already at their concurrency limit on this instance */
-  private busyOwners(): string[] {
+  private async busyOwners(): Promise<string[]> {
     if (!this.quotaForOwner) return []
     const busy: string[] = []
     for (const [ownerId, count] of this.runningByOwner) {
-      if (count >= this.quotaForOwner(ownerId).maxConcurrent) busy.push(ownerId)
+      const quota = await this.quotaForOwner(ownerId)
+      if (count >= quota.maxConcurrent) busy.push(ownerId)
     }
     return busy
   }
 
   private async pump(): Promise<void> {
     while (this.running < this.concurrency) {
-      const claimed = this.db.claimJob(this.instanceId, this.busyOwners())
+      const claimed = await this.db.claimJob(this.instanceId, await this.busyOwners())
       if (!claimed) {
         // nothing claimable: drop local entries that other instances took
+        const queued = await this.db.listJobs(200)
         this.pending = this.pending.filter((job) =>
-          this.db.listJobs(200).some(
+          queued.some(
             (row) =>
               row.task_id === job.taskId &&
               row.status === 'queued' &&
@@ -201,6 +211,7 @@ export class CaptureQueue {
               (job.generationId ? row.payload_json.includes(job.generationId) : true),
           ),
         )
+        await this.refreshQueuedCount()
         return
       }
       const payload = JSON.parse(claimed.payload_json) as {
@@ -219,10 +230,12 @@ export class CaptureQueue {
       )
       this.running++
       this.runningByOwner.set(job.ownerId, (this.runningByOwner.get(job.ownerId) ?? 0) + 1)
+      this.queuedCount = Math.max(0, this.queuedCount - 1)
       void this.runJob(job)
         .then(() => this.db.finishJob(claimed.id, 'done'))
         .catch((err) => this.db.finishJob(claimed.id, 'failed', err instanceof Error ? err.message : String(err)))
-        .finally(() => {
+        .finally(async () => {
+          await this.refreshQueuedCount()
           this.running--
           const left = (this.runningByOwner.get(job.ownerId) ?? 1) - 1
           if (left <= 0) this.runningByOwner.delete(job.ownerId)
@@ -233,9 +246,9 @@ export class CaptureQueue {
   }
 
   /** dead instances leave running jobs behind: requeue them after 30 min */
-  private requeueStale(): void {
+  private async requeueStale(): Promise<void> {
     try {
-      const n = this.db.requeueStaleJobs(30 * 60_000)
+      const n = await this.db.requeueStaleJobs(30 * 60_000)
       if (n > 0) console.log(`[queue] requeued ${n} stale job(s) from other instances`)
       void this.pump().catch(() => {})
     } catch (err) {
@@ -260,7 +273,7 @@ export class CaptureQueue {
   // ---------- capture ----------
 
   private async runCapture(job: QueueJob): Promise<void> {
-    const task = this.store.get(job.taskId)
+    const task = await this.store.get(job.taskId)
     if (!task) return
     await this.store.update(job.taskId, { status: 'running' })
     const spec: CaptureJobSpec = {
@@ -278,7 +291,7 @@ export class CaptureQueue {
           await this.store.update(task.id, { status: 'done', result: event.result })
         }
       })
-      const after = this.store.get(task.id)
+      const after = await this.store.get(task.id)
       if (after && after.status === 'running') {
         await this.store.update(task.id, { status: 'done' })
       }
@@ -292,7 +305,7 @@ export class CaptureQueue {
   // ---------- verification ----------
 
   private async runVerify(job: QueueJob): Promise<void> {
-    const task = this.store.get(job.taskId)
+    const task = await this.store.get(job.taskId)
     const verification = task?.verifications.find((v) => v.id === job.verificationId)
     if (!task || !verification) return
     await this.store.updateVerification(task.id, verification.id, { status: 'running' })
@@ -325,7 +338,7 @@ export class CaptureQueue {
           })
         }
       })
-      const current = this.store.get(task.id)?.verifications.find((v) => v.id === verification.id)
+      const current = (await this.store.get(task.id))?.verifications.find((v) => v.id === verification.id)
       if (current && current.status === 'running') {
         await this.store.updateVerification(task.id, verification.id, { status: 'done' })
       }
@@ -346,7 +359,7 @@ export class CaptureQueue {
   // ---------- generation ----------
 
   private async runGenerate(job: QueueJob): Promise<void> {
-    const task = this.store.get(job.taskId)
+    const task = await this.store.get(job.taskId)
     const generation = task?.generations.find((g) => g.id === job.generationId)
     if (!task || !generation) return
     await this.store.updateGeneration(task.id, generation.id, { status: 'running' })
@@ -377,9 +390,7 @@ export class CaptureQueue {
         } else if (event.type === 'loop') {
           await this.store.update(task.id, { loop: event.loop })
         } else if (event.type === 'verification') {
-          const existing = this.store
-            .get(task.id)
-            ?.verifications.find((v) => v.id === event.id)
+          const existing = (await this.store.get(task.id))?.verifications.find((v) => v.id === event.id)
           if (!existing) {
             await this.store.createVerification(task.id, event.repro, event.reproDir, {
               id: event.id,
@@ -399,7 +410,7 @@ export class CaptureQueue {
           })
         }
       })
-      const current = this.store.get(task.id)?.generations.find((g) => g.id === generation.id)
+      const current = (await this.store.get(task.id))?.generations.find((g) => g.id === generation.id)
       if (current && current.status === 'running') {
         await this.store.updateGeneration(task.id, generation.id, { status: 'done' })
       }

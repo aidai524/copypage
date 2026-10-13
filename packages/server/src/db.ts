@@ -206,69 +206,7 @@ export interface AuditRow {
  * SQLite-backed multi-tenant state. The database is the source of truth for
  * users, sessions, tasks and usage; artifacts stay on disk under dataDir.
  */
-/**
- * State store contract shared by the SQLite (single-host) and Postgres
- * (multi-host) backends. Consumers depend on this type, not the driver.
- */
-export interface Db {
-  readonly isPg?: boolean
-  createUser(user: Omit<UserRow, 'created_at' | 'updated_at' | 'email_verified'> & { email_verified?: number }): UserRow
-  getUserById(id: string): UserRow | undefined
-  getUserByEmail(email: string): UserRow | undefined
-  listUsers(): UserRow[]
-  countUsers(): number
-  updateUser(
-    id: string,
-    patch: Partial<Pick<UserRow, 'name' | 'role' | 'status' | 'plan' | 'quota_json' | 'password_hash' | 'email_verified'>>,
-  ): UserRow | undefined
-  setEmailVerified(userId: string): void
-  createSession(tokenHash: string, userId: string, expiresAt: string): void
-  getUserBySessionHash(tokenHash: string): UserRow | undefined
-  deleteSession(tokenHash: string): void
-  pruneSessions(): number
-  createApiToken(row: { id: string; user_id: string; name: string | null; token_hash: string }): void
-  getUserByApiTokenHash(tokenHash: string): UserRow | undefined
-  listApiTokens(userId: string): { id: string; name: string | null; created_at: string; last_used_at: string | null }[]
-  deleteApiToken(userId: string, id: string): boolean
-  insertTask(row: TaskRow): void
-  updateTask(id: string, patch: Record<string, string | number | null>): void
-  getTask(id: string): TaskRow | undefined
-  listTasks(ownerId?: string, limit?: number): TaskRow[]
-  deleteTask(id: string): boolean
-  countTasks(ownerId?: string): number
-  sumStorage(ownerId?: string): number
-  countActiveTasks(ownerId: string): number
-  expiredTaskIds(cutoffIso: string): string[]
-  enqueueJob(row: JobRow): void
-  claimJob(instanceId: string, excludeOwners?: string[]): JobRow | undefined
-  finishJob(id: string, status: 'done' | 'failed', error?: string): void
-  requeueStaleJobs(timeoutMs: number): number
-  countJobs(status?: JobRow['status'], ownerId?: string): number
-  listJobs(limit?: number): JobRow[]
-  deleteJobsForTask(taskId: string): void
-  listTasksUpdatedSince(ownerId: string | undefined, sinceIso: string, limit?: number): TaskRow[]
-  incrUsage(userId: string, kind: string, day: string, by?: number): void
-  getUsage(userId: string, day: string): Record<string, number>
-  createEmailToken(row: { id: string; user_id: string; kind: string; token_hash: string; expires_at: string }): void
-  getEmailToken(tokenHash: string): { id: string; user_id: string; kind: string } | undefined
-  useEmailToken(id: string): void
-  deleteEmailTokens(userId: string, kind: string): void
-  pruneEmailTokens(): void
-  deleteUserSessions(userId: string): void
-  createWarning(row: WarningRow): void
-  recentWarning(userId: string | null, kind: string, hours: number): WarningRow | undefined
-  listWarnings(userId?: string, limit?: number): WarningRow[]
-  acknowledgeWarning(userId: string, id: string): boolean
-  deleteWarning(id: string): boolean
-  addBlock(row: BlockRow): void
-  removeBlock(id: string): boolean
-  listBlocks(): BlockRow[]
-  isDomainBlocked(host: string): boolean
-  audit(actorId: string | null, action: string, detail?: unknown): void
-  listAudit(limit?: number): AuditRow[]
-}
-
-export class SqliteDb implements Db {
+export class SqliteDb {
   readonly db: DatabaseSync
 
   constructor(dataDir: string) {
@@ -296,7 +234,7 @@ export class SqliteDb implements Db {
 
   // ---------- users ----------
 
-  createUser(user: Omit<UserRow, 'created_at' | 'updated_at' | 'email_verified'> & { email_verified?: number }): UserRow {
+  async createUser(user: Omit<UserRow, 'created_at' | 'updated_at' | 'email_verified'> & { email_verified?: number }) {
     const now = new Date().toISOString()
     this.db
       .prepare(
@@ -316,40 +254,42 @@ export class SqliteDb implements Db {
         now,
         now,
       )
-    return this.getUserById(user.id)!
+    const created = await this.getUserById(user.id)
+    if (!created) throw new Error('user creation failed')
+    return created
   }
 
-  setEmailVerified(userId: string): void {
+  async setEmailVerified(userId: string) {
     this.db
       .prepare('UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?')
       .run(new Date().toISOString(), userId)
   }
 
-  getUserById(id: string): UserRow | undefined {
+  async getUserById(id: string) {
     return this.db.prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as UserRow | undefined
   }
 
-  getUserByEmail(email: string): UserRow | undefined {
+  async getUserByEmail(email: string) {
     return this.db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase()) as
       | UserRow
       | undefined
   }
 
-  listUsers(): UserRow[] {
+  async listUsers() {
     return this.db.prepare('SELECT * FROM users ORDER BY created_at DESC').all() as unknown as UserRow[]
   }
 
-  countUsers(): number {
+  async countUsers() {
     const row = this.db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }
     return row.n
   }
 
-  updateUser(
+  async updateUser(
     id: string,
     patch: Partial<
       Pick<UserRow, 'name' | 'role' | 'status' | 'plan' | 'quota_json' | 'password_hash' | 'email_verified'>
     >,
-  ): UserRow | undefined {
+  ) {
     const fields = Object.keys(patch)
     if (fields.length === 0) return this.getUserById(id)
     const sets = fields.map((f) => `${f} = ?`).join(', ')
@@ -362,13 +302,13 @@ export class SqliteDb implements Db {
 
   // ---------- sessions ----------
 
-  createSession(tokenHash: string, userId: string, expiresAt: string): void {
+  async createSession(tokenHash: string, userId: string, expiresAt: string) {
     this.db
       .prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
       .run(tokenHash, userId, new Date().toISOString(), expiresAt)
   }
 
-  getUserBySessionHash(tokenHash: string): UserRow | undefined {
+  async getUserBySessionHash(tokenHash: string) {
     const row = this.db
       .prepare(
         `SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
@@ -378,24 +318,24 @@ export class SqliteDb implements Db {
     return row
   }
 
-  deleteSession(tokenHash: string): void {
+  async deleteSession(tokenHash: string) {
     this.db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash)
   }
 
-  pruneSessions(): number {
+  async pruneSessions() {
     const res = this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(new Date().toISOString())
     return Number(res.changes)
   }
 
   // ---------- api tokens ----------
 
-  createApiToken(row: { id: string; user_id: string; name: string | null; token_hash: string }): void {
+  async createApiToken(row: { id: string; user_id: string; name: string | null; token_hash: string }) {
     this.db
       .prepare('INSERT INTO api_tokens (id, user_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)')
       .run(row.id, row.user_id, row.name, row.token_hash, new Date().toISOString())
   }
 
-  getUserByApiTokenHash(tokenHash: string): UserRow | undefined {
+  async getUserByApiTokenHash(tokenHash: string) {
     const row = this.db
       .prepare(
         `SELECT u.* FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?`,
@@ -409,20 +349,20 @@ export class SqliteDb implements Db {
     return row
   }
 
-  listApiTokens(userId: string): { id: string; name: string | null; created_at: string; last_used_at: string | null }[] {
+  async listApiTokens(userId: string) {
     return this.db
       .prepare('SELECT id, name, created_at, last_used_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC')
       .all(userId) as { id: string; name: string | null; created_at: string; last_used_at: string | null }[]
   }
 
-  deleteApiToken(userId: string, id: string): boolean {
+  async deleteApiToken(userId: string, id: string) {
     const res = this.db.prepare('DELETE FROM api_tokens WHERE user_id = ? AND id = ?').run(userId, id)
     return Number(res.changes) > 0
   }
 
   // ---------- tasks ----------
 
-  insertTask(row: TaskRow): void {
+  async insertTask(row: TaskRow) {
     this.db
       .prepare(
         `INSERT INTO tasks (id, owner_id, status, input_json, options_json, progress_json, loop_json,
@@ -448,7 +388,7 @@ export class SqliteDb implements Db {
       )
   }
 
-  updateTask(id: string, patch: Partial<Record<(typeof TASK_UPDATABLE_FIELDS)[number], string | number | null>>): void {
+  async updateTask(id: string, patch: Partial<Record<(typeof TASK_UPDATABLE_FIELDS)[number], string | number | null>>) {
     const fields = Object.keys(patch)
     if (fields.length === 0) return
     for (const key of fields) {
@@ -459,11 +399,11 @@ export class SqliteDb implements Db {
     this.db.prepare(`UPDATE tasks SET ${sets} WHERE id = ?`).run(...values, id)
   }
 
-  getTask(id: string): TaskRow | undefined {
+  async getTask(id: string) {
     return this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as unknown as TaskRow | undefined
   }
 
-  listTasks(ownerId?: string, limit = 500): TaskRow[] {
+  async listTasks(ownerId?: string, limit = 500) {
     if (ownerId) {
       return this.db
         .prepare('SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC LIMIT ?')
@@ -474,19 +414,19 @@ export class SqliteDb implements Db {
       .all(limit) as unknown as TaskRow[]
   }
 
-  deleteTask(id: string): boolean {
+  async deleteTask(id: string) {
     const res = this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
     return Number(res.changes) > 0
   }
 
-  countTasks(ownerId?: string): number {
+  async countTasks(ownerId?: string) {
     const row = ownerId
       ? (this.db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE owner_id = ?').get(ownerId) as { n: number })
       : (this.db.prepare('SELECT COUNT(*) AS n FROM tasks').get() as { n: number })
     return row.n
   }
 
-  sumStorage(ownerId?: string): number {
+  async sumStorage(ownerId?: string) {
     const row = ownerId
       ? (this.db
           .prepare('SELECT COALESCE(SUM(size_bytes), 0) AS n FROM tasks WHERE owner_id = ?')
@@ -495,7 +435,7 @@ export class SqliteDb implements Db {
     return Number(row.n)
   }
 
-  countActiveTasks(ownerId: string): number {
+  async countActiveTasks(ownerId: string) {
     const row = this.db
       .prepare("SELECT COUNT(*) AS n FROM tasks WHERE owner_id = ? AND status IN ('queued','running')")
       .get(ownerId) as { n: number }
@@ -503,7 +443,7 @@ export class SqliteDb implements Db {
   }
 
   /** ids of finished tasks older than the cutoff (retention sweep) */
-  expiredTaskIds(cutoffIso: string): string[] {
+  async expiredTaskIds(cutoffIso: string) {
     return (
       this.db
         .prepare("SELECT id FROM tasks WHERE status NOT IN ('queued','running') AND updated_at < ?")
@@ -513,7 +453,7 @@ export class SqliteDb implements Db {
 
   // ---------- job queue (multi-instance safe) ----------
 
-  enqueueJob(row: JobRow): void {
+  async enqueueJob(row: JobRow) {
     this.db
       .prepare(
         `INSERT INTO jobs (id, kind, task_id, owner_id, payload_json, status, created_at)
@@ -526,7 +466,7 @@ export class SqliteDb implements Db {
    * Atomically claim the oldest queued job this instance can run. Excluded
    * owners are those already at their per-tenant concurrency limit.
    */
-  claimJob(instanceId: string, excludeOwners: string[] = []): JobRow | undefined {
+  async claimJob(instanceId: string, excludeOwners: string[] = []) {
     const now = new Date().toISOString()
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -551,14 +491,14 @@ export class SqliteDb implements Db {
     }
   }
 
-  finishJob(id: string, status: 'done' | 'failed', error?: string): void {
+  async finishJob(id: string, status: 'done' | 'failed', error?: string) {
     this.db
       .prepare('UPDATE jobs SET status = ?, error = ?, finished_at = ? WHERE id = ?')
       .run(status, error ?? null, new Date().toISOString(), id)
   }
 
   /** jobs whose instance died mid-run: put them back on the queue */
-  requeueStaleJobs(timeoutMs: number): number {
+  async requeueStaleJobs(timeoutMs: number) {
     const cutoff = new Date(Date.now() - timeoutMs).toISOString()
     const res = this.db
       .prepare(
@@ -568,7 +508,7 @@ export class SqliteDb implements Db {
     return Number(res.changes)
   }
 
-  countJobs(status?: JobRow['status'], ownerId?: string): number {
+  async countJobs(status?: JobRow['status'], ownerId?: string) {
     const clauses: string[] = []
     const values: string[] = []
     if (status) {
@@ -584,18 +524,18 @@ export class SqliteDb implements Db {
     return row.n
   }
 
-  listJobs(limit = 100): JobRow[] {
+  async listJobs(limit = 100) {
     return this.db
       .prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?')
       .all(limit) as unknown as JobRow[]
   }
 
-  deleteJobsForTask(taskId: string): void {
+  async deleteJobsForTask(taskId: string) {
     this.db.prepare('DELETE FROM jobs WHERE task_id = ?').run(taskId)
   }
 
   /** tasks changed since a timestamp — drives SSE polling across instances */
-  listTasksUpdatedSince(ownerId: string | undefined, sinceIso: string, limit = 100): TaskRow[] {
+  async listTasksUpdatedSince(ownerId: string | undefined, sinceIso: string, limit = 100) {
     if (ownerId) {
       return this.db
         .prepare('SELECT * FROM tasks WHERE owner_id = ? AND updated_at > ? ORDER BY updated_at LIMIT ?')
@@ -608,7 +548,7 @@ export class SqliteDb implements Db {
 
   // ---------- usage ----------
 
-  incrUsage(userId: string, kind: string, day: string, by = 1): void {
+  async incrUsage(userId: string, kind: string, day: string, by = 1) {
     this.db
       .prepare(
         `INSERT INTO usage_counters (user_id, day, kind, count) VALUES (?, ?, ?, ?)
@@ -617,7 +557,7 @@ export class SqliteDb implements Db {
       .run(userId, day, kind, by, by)
   }
 
-  getUsage(userId: string, day: string): Record<string, number> {
+  async getUsage(userId: string, day: string) {
     const rows = this.db
       .prepare('SELECT kind, count FROM usage_counters WHERE user_id = ? AND day = ?')
       .all(userId, day) as { kind: string; count: number }[]
@@ -626,7 +566,7 @@ export class SqliteDb implements Db {
 
   // ---------- email tokens ----------
 
-  createEmailToken(row: { id: string; user_id: string; kind: string; token_hash: string; expires_at: string }): void {
+  async createEmailToken(row: { id: string; user_id: string; kind: string; token_hash: string; expires_at: string }) {
     this.db
       .prepare(
         'INSERT INTO email_tokens (id, user_id, kind, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -635,7 +575,7 @@ export class SqliteDb implements Db {
   }
 
   /** valid = matching hash, unused, not expired */
-  getEmailToken(tokenHash: string): { id: string; user_id: string; kind: string } | undefined {
+  async getEmailToken(tokenHash: string) {
     return this.db
       .prepare(
         `SELECT id, user_id, kind FROM email_tokens
@@ -644,41 +584,41 @@ export class SqliteDb implements Db {
       .get(tokenHash, new Date().toISOString()) as { id: string; user_id: string; kind: string } | undefined
   }
 
-  useEmailToken(id: string): void {
+  async useEmailToken(id: string) {
     this.db.prepare('UPDATE email_tokens SET used_at = ? WHERE id = ?').run(new Date().toISOString(), id)
   }
 
-  deleteEmailTokens(userId: string, kind: string): void {
+  async deleteEmailTokens(userId: string, kind: string) {
     this.db.prepare('DELETE FROM email_tokens WHERE user_id = ? AND kind = ?').run(userId, kind)
   }
 
-  pruneEmailTokens(): void {
+  async pruneEmailTokens() {
     this.db.prepare('DELETE FROM email_tokens WHERE expires_at <= ?').run(new Date().toISOString())
   }
 
-  deleteUserSessions(userId: string): void {
+  async deleteUserSessions(userId: string) {
     this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
   }
 
   // ---------- blocks ----------
 
-  addBlock(row: BlockRow): void {
+  async addBlock(row: BlockRow) {
     this.db
       .prepare('INSERT OR REPLACE INTO blocks (id, kind, value, note, created_at) VALUES (?, ?, ?, ?, ?)')
       .run(row.id, row.kind, row.value.toLowerCase(), row.note, row.created_at)
   }
 
-  removeBlock(id: string): boolean {
+  async removeBlock(id: string) {
     const res = this.db.prepare('DELETE FROM blocks WHERE id = ?').run(id)
     return Number(res.changes) > 0
   }
 
-  listBlocks(): BlockRow[] {
+  async listBlocks() {
     return this.db.prepare('SELECT * FROM blocks ORDER BY created_at DESC').all() as unknown as BlockRow[]
   }
 
   /** blocked when the entry equals the host or is one of its parent domains */
-  isDomainBlocked(host: string): boolean {
+  async isDomainBlocked(host: string) {
     const h = host.toLowerCase()
     const rows = this.db.prepare("SELECT value FROM blocks WHERE kind = 'domain'").all() as { value: string }[]
     return rows.some((r) => h === r.value || h.endsWith(`.${r.value}`) || r.value === '*')
@@ -686,21 +626,21 @@ export class SqliteDb implements Db {
 
   // ---------- warnings (abuse / quota signals) ----------
 
-  createWarning(row: WarningRow): void {
+  async createWarning(row: WarningRow) {
     this.db
       .prepare('INSERT INTO warnings (id, user_id, kind, message, acknowledged, created_at) VALUES (?, ?, ?, ?, ?, ?)')
       .run(row.id, row.user_id, row.kind, row.message, row.acknowledged, row.created_at)
   }
 
   /** dedupe window: same user+kind within `hours` */
-  recentWarning(userId: string | null, kind: string, hours: number): WarningRow | undefined {
+  async recentWarning(userId: string | null, kind: string, hours: number) {
     const cutoff = new Date(Date.now() - hours * 3600_000).toISOString()
     return this.db
       .prepare('SELECT * FROM warnings WHERE user_id IS ? AND kind = ? AND created_at > ? ORDER BY created_at DESC LIMIT 1')
       .get(userId, kind, cutoff)  as unknown as WarningRow | undefined
   }
 
-  listWarnings(userId?: string, limit = 100): WarningRow[] {
+  async listWarnings(userId?: string, limit = 100) {
     if (userId) {
       return this.db
         .prepare('SELECT * FROM warnings WHERE user_id = ? ORDER BY created_at DESC LIMIT ?')
@@ -711,27 +651,87 @@ export class SqliteDb implements Db {
       .all(limit) as unknown as WarningRow[]
   }
 
-  acknowledgeWarning(userId: string, id: string): boolean {
+  async acknowledgeWarning(userId: string, id: string) {
     const res = this.db
       .prepare('UPDATE warnings SET acknowledged = 1 WHERE id = ? AND user_id = ?')
       .run(id, userId)
     return Number(res.changes) > 0
   }
 
-  deleteWarning(id: string): boolean {
+  async deleteWarning(id: string) {
     const res = this.db.prepare('DELETE FROM warnings WHERE id = ?').run(id)
     return Number(res.changes) > 0
   }
 
   // ---------- audit ----------
 
-  audit(actorId: string | null, action: string, detail?: unknown): void {
+  async audit(actorId: string | null, action: string, detail?: unknown) {
     this.db
       .prepare('INSERT INTO audit_log (at, actor_id, action, detail) VALUES (?, ?, ?, ?)')
       .run(new Date().toISOString(), actorId, action, detail === undefined ? null : JSON.stringify(detail))
   }
 
-  listAudit(limit = 200): AuditRow[] {
+  async listAudit(limit = 200) {
     return this.db.prepare('SELECT * FROM audit_log ORDER BY id DESC LIMIT ?').all(limit) as unknown as AuditRow[]
   }
 }
+
+/**
+ * State store contract shared by the SQLite (single-host) and Postgres
+ * (multi-host) backends. Every method is async so a network driver fits.
+ */
+export type Db = Pick<
+  SqliteDb,
+  | 'close'
+  | 'createUser'
+  | 'getUserById'
+  | 'getUserByEmail'
+  | 'listUsers'
+  | 'countUsers'
+  | 'updateUser'
+  | 'setEmailVerified'
+  | 'createSession'
+  | 'getUserBySessionHash'
+  | 'deleteSession'
+  | 'pruneSessions'
+  | 'createApiToken'
+  | 'getUserByApiTokenHash'
+  | 'listApiTokens'
+  | 'deleteApiToken'
+  | 'insertTask'
+  | 'updateTask'
+  | 'getTask'
+  | 'listTasks'
+  | 'deleteTask'
+  | 'countTasks'
+  | 'sumStorage'
+  | 'countActiveTasks'
+  | 'expiredTaskIds'
+  | 'enqueueJob'
+  | 'claimJob'
+  | 'finishJob'
+  | 'requeueStaleJobs'
+  | 'countJobs'
+  | 'listJobs'
+  | 'deleteJobsForTask'
+  | 'listTasksUpdatedSince'
+  | 'incrUsage'
+  | 'getUsage'
+  | 'createEmailToken'
+  | 'getEmailToken'
+  | 'useEmailToken'
+  | 'deleteEmailTokens'
+  | 'pruneEmailTokens'
+  | 'deleteUserSessions'
+  | 'createWarning'
+  | 'recentWarning'
+  | 'listWarnings'
+  | 'acknowledgeWarning'
+  | 'deleteWarning'
+  | 'addBlock'
+  | 'removeBlock'
+  | 'listBlocks'
+  | 'isDomainBlocked'
+  | 'audit'
+  | 'listAudit'
+>

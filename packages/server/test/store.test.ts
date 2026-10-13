@@ -33,11 +33,11 @@ describe('TaskStore', () => {
     // no in-memory cache: a fresh store over the same database sees everything
     const db2 = new Db(dir)
     const store2 = new TaskStore(dir, db2)
-    expect(store2.get(task.id)!.status).toBe('running')
-    expect(store2.get(task.id)!.progress[0].message).toBe('viewport 800: loading')
-    expect(store2.list('u1')).toHaveLength(1)
-    expect(store2.list('u2')).toHaveLength(0)
-    expect(store2.count('u1')).toBe(1)
+    expect((await store2.get(task.id))!.status).toBe('running')
+    expect((await store2.get(task.id))!.progress[0].message).toBe('viewport 800: loading')
+    expect(await store2.list('u1')).toHaveLength(1)
+    expect(await store2.list('u2')).toHaveLength(0)
+    expect(await store2.count('u1')).toBe(1)
     db2.close()
   })
 
@@ -59,7 +59,7 @@ describe('TaskStore', () => {
     expect(generation.status).toBe('queued')
     await store.updateGeneration(task.id, generation.id, { status: 'done', finalDecision: 'pass' })
 
-    const reloaded = store.get(task.id)!
+    const reloaded = (await store.get(task.id))!
     expect(reloaded.verifications).toHaveLength(1)
     expect(reloaded.verifications[0].status).toBe('done')
     expect(reloaded.generations[0].finalDecision).toBe('pass')
@@ -76,14 +76,14 @@ describe('TaskStore', () => {
   it('deletes tasks and sweeps expired ones', async () => {
     const task = await store.create('u1', { type: 'url', source: 'https://example.com' })
     await store.delete(task.id)
-    expect(store.get(task.id)).toBeUndefined()
+    expect(await store.get(task.id)).toBeUndefined()
 
     const old = await store.create('u1', { type: 'url', source: 'https://example.com' })
     await store.update(old.id, { status: 'done' })
-    db.updateTask(old.id, { updated_at: new Date(Date.now() - 10_000).toISOString() })
+    await db.updateTask(old.id, { updated_at: new Date(Date.now() - 10_000).toISOString() })
     const removed = await store.cleanupOlderThan(500)
     expect(removed).toContain(old.id)
-    expect(store.get(old.id)).toBeUndefined()
+    expect(await store.get(old.id)).toBeUndefined()
   })
 
   it('rejects unknown task ids on update', async () => {

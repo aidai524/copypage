@@ -19,16 +19,16 @@ export interface WarnResult {
   message: string
 }
 
-export function warnUser(
+export async function warnUser(
   db: Db,
   userId: string | null,
   kind: WarningKind,
   message: string,
   opts: { dedupeHours?: number } = {},
-): WarnResult {
+): Promise<WarnResult> {
   const dedupeHours = opts.dedupeHours ?? 24
-  if (db.recentWarning(userId, kind, dedupeHours)) return { created: false, message }
-  db.createWarning({
+  if (await db.recentWarning(userId, kind, dedupeHours)) return { created: false, message }
+  await db.createWarning({
     id: randomUUID(),
     user_id: userId,
     kind,
@@ -36,19 +36,19 @@ export function warnUser(
     acknowledged: 0,
     created_at: new Date().toISOString(),
   })
-  db.audit(userId, `warning.${kind}`, { message })
+  await db.audit(userId, `warning.${kind}`, { message })
   return { created: true, message }
 }
 
 /** warn once when a tenant crosses 80% of a quota */
-export function maybeQuotaWarning(
+export async function maybeQuotaWarning(
   db: Db,
   userId: string,
   kind: string,
   used: number,
   limit: number,
   label: string,
-): WarnResult {
+): Promise<WarnResult> {
   if (limit <= 0 || used / limit < 0.8) return { created: false, message: '' }
   return warnUser(
     db,

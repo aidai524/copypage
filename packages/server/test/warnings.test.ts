@@ -114,7 +114,7 @@ describe('warnings', () => {
 
   it('flags repeated job failures for the operator', async () => {
     // drop the quota-ballast task and raise the override so three jobs fit
-    for (const task of server.store.list(user.user.id)) await server.store.delete(task.id)
+    for (const task of await server.store.list(user.user.id)) await server.store.delete(task.id)
     const patched = await fetch(`${server.url}/api/admin/users/${user.user.id}`, {
       method: 'PATCH',
       headers: { cookie: admin.cookie, 'content-type': 'application/json' },
@@ -135,7 +135,7 @@ describe('warnings', () => {
     const deadline = Date.now() + 60_000
     let warned = false
     while (Date.now() < deadline) {
-      const warnings = server.db.listWarnings(user.user.id)
+      const warnings = await server.db.listWarnings(user.user.id)
       if (warnings.some((w) => w.kind === 'repeated_failures')) {
         warned = true
         break

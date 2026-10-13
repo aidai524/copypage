@@ -90,19 +90,20 @@ export function startAlertRunner(opts: AlertRunnerOptions): { stop: () => void }
     void (async () => {
       try {
         const recent = opts.recentJobs()
+        const tasks = await opts.store.list()
         const alerts = evaluateAlerts(
           {
-            queueDepth: opts.store.list().filter((t) => t.status === 'queued').length,
-            runningJobs: opts.store.list().filter((t) => t.status === 'running').length,
+            queueDepth: tasks.filter((t) => t.status === 'queued').length,
+            runningJobs: tasks.filter((t) => t.status === 'running').length,
             recent,
             diskUsedPct: await opts.diskUsedPct(),
-            storageBytes: opts.db.sumStorage(),
+            storageBytes: await opts.db.sumStorage(),
           },
           state,
         )
         for (const alert of alerts) {
           opts.metrics.inc('copypage_alerts_total', { rule: alert.rule })
-          opts.db.audit(null, `alert.${alert.rule}`, { detail: alert.detail })
+          await opts.db.audit(null, `alert.${alert.rule}`, { detail: alert.detail })
           opts.onProgress?.(`[alert] ${alert.title}: ${alert.detail}`)
           if (opts.config.adminAlertEmail) {
             await opts.email
