@@ -170,8 +170,26 @@
 | 访客页正文 14px 被判 body-size FAIL | 闸门 `body-size` FAIL | 正文一律 `--step-body`(17~19px) |
 | 访客页图片只有 3 张、首屏无主导元素 | 闸门 `few-pictures` / `focal-point` FAIL | 补第 4 张真实图;标题升到 display 级(4.8vw) |
 | `skip` 链接未着色,浏览器默认蓝污染配色 | 闸门 `default-link` WARN | 显式继承主题色 |
+| 揭示层依赖 JS:脚本被禁用时标题/正文永远不可见 | 自查(闸门不测无 JS) | 动效层收进 `.js` 作用域,禁用 JS 时全部内容可见 |
+| 控制台下半屏在 1440 只有 18% 覆盖,`empty-screens` 在阈值上抖动 | 闸门 `empty-screens`(r12 是 21%/18% 侥幸通过) | 详情块改色阶面 + 收紧间距 → 51%,跑两次稳定 |
+| 禁用 JS 时 `/app` 是空白页 | 自查 | 加 `<noscript>` 提示并给回首页的链接 |
 
-### 9.5 仍未做(与 §8 一致)
+### 9.5 公网验证(2026-10-14,https://kloon.dev)
+
+| 项 | 结果 |
+|---|---|
+| `lint.mjs` | 0 FAIL / 0 WARN |
+| `inspect.mjs` `/`、`/app`、`/app?demo=1` × 1440/768/390 | 全部 **0 FAIL / 0 WARN** |
+| 无 JS 访问 | 落地页标题可见(opacity 1);`/app` 显示 noscript 提示 |
+| 服务器巡检 `check.sh` | **8 项通过 / 0 失败**(令牌、/metrics 20 条指标、队列、Resend、沙箱) |
+| 公网端到端 `work/e2e-live.mts` | **9/9**:落地页 4 张真实图 + 滑块可键盘操作 → 登录 → 真实捕获 `https://example.com` **完成 · 8.0s** |
+| 容器 | `copypage-copypage-1` healthy,`/`/app`/`base.css`/`demo/*` 全部 200 |
+| 测试 | 153/154;`pg-db.test.ts` 流水线用例在全量并发下偶发超时,单独跑 7/7(非回归) |
+
+复现命令:`npx tsx work/e2e-live.mts`(需先 `ssh root@103.3.62.56 'cat /root/kloon-admin-password.txt' > /tmp/kloon-admin-creds.txt`)、
+`npx tsx work/no-js-check.mts`、`COPYPAGE_CHECK_URL=https://kloon.dev ./deploy/check.sh`。
+
+### 9.6 仍未做(与 §8 一致)
 
 - 公开注册默认关闭(`COPYPAGE_ALLOW_REGISTRATION=true` 才开),落地页已用一句话说明"注册需管理员开通"。
 - `www.kloon.dev` 记录 + Caddy `www` 块。
