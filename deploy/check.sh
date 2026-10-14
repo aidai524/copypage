@@ -61,7 +61,17 @@ else
   else
     note "无令牌模式:确认只绑定了 loopback 或已被反代保护"
   fi
-  curl -s -m 5 "$BASE/metrics" | grep -q "copypage_" && pass "/metrics 可读" || note "/metrics 无数据(可能刚启动,等 30s)"
+  # /metrics 只对 loopback 免鉴权;经反代/网关访问时需要令牌
+  if [[ -n "${COPYPAGE_TOKEN:-}" ]]; then
+    METRICS=$(curl -s -m 5 -H "Authorization: Bearer $COPYPAGE_TOKEN" "$BASE/metrics" || true)
+  else
+    METRICS=$(curl -s -m 5 "$BASE/metrics" || true)
+  fi
+  if echo "$METRICS" | grep -q "copypage_"; then
+    pass "/metrics 可读($(echo "$METRICS" | grep -c '^copypage_') 条指标)"
+  else
+    note "/metrics 无可读数据(刚启动需等 30s 生成 gauge;非 loopback 需令牌)"
+  fi
 fi
 
 echo "== 3. 队列与最近任务 =="
