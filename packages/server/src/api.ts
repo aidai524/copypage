@@ -349,8 +349,14 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       (req.method === 'GET' || req.method === 'HEAD') &&
       pathname !== '/metrics'
     ) {
+      // /app and everything under it is the console: the router inside it owns
+      // /app/new, /app/tasks/<id> and /app/admin
       const rel =
-        pathname === '/' ? 'landing.html' : pathname === '/app' ? 'index.html' : decodeURIComponent(pathname.slice(1))
+        pathname === '/'
+          ? 'landing.html'
+          : pathname === '/app' || pathname.startsWith('/app/')
+            ? 'index.html'
+            : decodeURIComponent(pathname.slice(1))
       await serveFile(req, res, publicDir, rel)
       return
     }

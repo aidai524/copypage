@@ -71,7 +71,7 @@ input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-o
 
 .state.queued { color: var(--muted); }
 
-.state.failed { color: var(--accent); }
+.state.failed { color: var(--danger); }
 
 .state.pass { color: var(--ink); }
 
@@ -167,6 +167,8 @@ input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-o
     --muted: #a1a1aa;
     --accent: #4ade80;
     --accent-ink: #052e16;
+    /* semantic only: failures and error text. Never used as a brand accent. */
+    --danger: #ff6b6b;
 
     --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
     --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);

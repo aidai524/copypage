@@ -71,8 +71,15 @@ describe('capture service', () => {
     const console_ = await fetch(`${server.url}/app`)
     expect(console_.status).toBe(200)
     const consoleHtml = await console_.text()
-    expect(consoleHtml).toContain('id="sidebar"')
+    expect(consoleHtml).toContain('id="page"')
     expect(consoleHtml).toContain('/base.css')
+
+    // the console owns its own routes: /app/new, /app/tasks/<id>, /app/admin
+    for (const route of ['/app/new', '/app/tasks/demo-1', '/app/admin']) {
+      const res = await fetch(`${server.url}${route}`)
+      expect(res.status, route).toBe(200)
+      expect(await res.text()).toContain('id="page"')
+    }
 
     const shared = await fetch(`${server.url}/base.css`)
     expect(shared.status).toBe(200)

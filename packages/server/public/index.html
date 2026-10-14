@@ -54,42 +54,59 @@ main { padding: 0 var(--margin); }
 .capture .grow input { width: 100%; }
 .capture .opts { display: flex; gap: 18px; flex-wrap: wrap; font-size: var(--step-small); color: var(--muted); }
 .capture .opts label { display: flex; align-items: center; gap: 8px; }
-/* ---------- ledger: two-ended rows, hover preview to the right ---------- */
-  .section-head { display: flex; align-items: baseline; gap: 16px; margin: var(--gap-section) 0 24px; }
-.section-head h2 { font-size: var(--step-lead); }
-.section-head .count { color: var(--muted); font-size: var(--step-small); }
-.ledger { position: relative; }
-.ledger ul { list-style: none; margin: 0; padding: 0; }
-.ledger li { border-radius: var(--radius); }
-.row {
-    display: grid; grid-template-columns: 1fr auto; gap: 4px 16px;
-    width: 100%; text-align: left; padding: 11px 12px; border-radius: var(--radius);
-    transition: background-color .15s ease, opacity .15s ease;
+  /* ---------- page frame: list / new / detail / admin share one router outlet ---------- */
+  #page { max-width: 1180px; margin: 0 auto; padding: 0 var(--margin) clamp(40px, 6vw, 80px); }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: clamp(24px, 4vw, 48px) 0 20px; }
+  .page-head h1 { font-size: clamp(2rem, 4.8vw, 6rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .page-head .action { text-decoration: none; }
+  .page-note { margin: 12px 0 0; color: var(--muted); font-size: var(--step-body); max-width: 62ch; }
+  .head-actions { display: flex; align-items: center; gap: 16px; }
+  .back { display: inline-block; color: var(--muted); font-size: var(--step-small); text-decoration: none; }
+  .wrap-any { overflow-wrap: anywhere; }
+  .frame.auto { aspect-ratio: auto; }
+  .frame.auto img { height: auto; }
+  .back:hover { color: var(--ink); }
+
+  /* ---------- list: one row per task, patched in place instead of re-rendered ---------- */
+  .tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .task-row {
+    display: grid; grid-template-columns: 104px minmax(0, 1fr) auto; gap: 4px 18px; align-items: center;
+    padding: 12px; border-radius: var(--radius); background: var(--surface); color: inherit; text-decoration: none;
+    transition: background-color .15s ease;
   }
-.row .name { font-size: var(--step-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .kind { grid-column: 1; color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
-.row .metric { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-align: right; font-variant-numeric: tabular-nums; }
-.row .metric b { display: block; font-size: var(--step-body); font-weight: 600; }
-.row .metric span { color: var(--muted); font-size: var(--step-small); }
-.row.selected { background: var(--surface-2); }
-.ledger ul:hover .row:not(:hover) { opacity: .5; }
-.row:hover { background: var(--surface); }
-.preview {
-    display: none;
-    position: absolute; left: calc(100% + 32px); width: min(340px, 34vw);
-    aspect-ratio: 16 / 10; overflow: hidden; background: var(--surface);
-    opacity: 0; pointer-events: none; transition: opacity .15s ease;
+  .task-row:hover { background: var(--surface-2); }
+  .task-row .thumb { grid-row: 1 / span 2; width: 104px; aspect-ratio: 16 / 10; border-radius: var(--radius); overflow: hidden; background: var(--surface-2); }
+  .task-row .thumb:empty { background: none; }
+  .task-row .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .task-row .name { font-size: var(--step-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-row .kind { color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+  .task-row .metric { grid-column: 3; grid-row: 1 / span 2; text-align: right; font-variant-numeric: tabular-nums; }
+  .task-row .metric b { display: block; font-size: var(--step-body); font-weight: 600; }
+  .task-row .metric span { color: var(--muted); font-size: var(--step-small); }
+  .task-row { position: relative; overflow: hidden; }
+  .row-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--surface-2); }
+  .row-progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .6s cubic-bezier(.2, .7, .2, 1); }
+  @media (max-width: 640px) {
+    .task-row { grid-template-columns: 72px minmax(0, 1fr); }
+    .task-row .thumb { width: 72px; }
+    .task-row .metric { grid-column: 2; grid-row: 3; text-align: left; display: flex; gap: 10px; align-items: baseline; }
   }
-.preview img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
-.preview.on { opacity: 1; }
-@media (min-width: 1600px) { .preview { display: block; } }
-@media (max-width: 900px) {
-    .row .thumb { grid-column: 1 / -1; aspect-ratio: 16 / 10; overflow: hidden; margin-bottom: 8px; }
-  }
-.thumb { display: none; }
-@media (max-width: 900px) { .thumb { display: block; background: var(--surface); } .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; } }
+
+  /* ---------- progress: a running task shows motion instead of a blinking screen ---------- */
+  .progress { height: 4px; background: var(--surface-2); border-radius: var(--radius); overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .6s cubic-bezier(.2, .7, .2, 1); }
+  .progress-note { margin: 12px 0 0; color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+
+  /* ---------- streamed log: lines are appended, never re-rendered ---------- */
+  .log-line { display: block; animation: lineIn .3s cubic-bezier(.2, .7, .2, 1); }
+  @keyframes lineIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .form-actions { display: flex; align-items: center; gap: 20px; }
+  .form-actions .quiet { text-decoration: none; }
+  .auth-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(24px, 4vw, 56px); align-items: start; }
+  @media (max-width: 900px) { .auth-wrap { grid-template-columns: 1fr; } }
+
 /* ---------- detail: input half / output half, then the figure bars ---------- */
-  #detail { padding-top: clamp(20px, 3.5vw, 44px); }
 .detail-block { margin-bottom: 18px; background: var(--surface-2); border-radius: var(--radius); padding: clamp(16px, 2vw, 24px); }
 .detail-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
 .detail-head h3 { font-size: var(--step-lead); word-break: break-all; }
@@ -150,8 +167,8 @@ main { padding: 0 var(--margin); }
 </style>
 </head>
 <body>
-<a class="skip" href="#main">
-<noscript><p style="margin:0;padding:16px var(--margin);background:var(--surface);color:var(--ink)">控制台需要 JavaScript 才能运行。想先了解它能做什么，<a href="/" style="color:var(--accent)">看首页</a>。</p></noscript>跳到主内容</a>
+<a class="skip" href="#main">跳到主内容</a>
+<noscript><p style="margin:0;padding:16px var(--margin);background:var(--surface);color:var(--ink)">控制台需要 JavaScript 才能运行。想先了解它能做什么，<a href="/" style="color:var(--accent)">看首页</a>。</p></noscript>
 
 <header class="bar">
   <div class="bar-in">
@@ -171,10 +188,7 @@ main { padding: 0 var(--margin); }
 <div class="banner" id="banner" hidden></div>
 
 <main id="main">
-  <div class="grid" id="app">
-    <div id="sidebar"></div>
-    <section id="detail"><p class="empty">正在载入…</p></section>
-  </div>
+  <div id="page"><p class="empty" style="padding:48px var(--margin)">正在载入…</p></div>
 </main>
 
 <script>
@@ -215,7 +229,7 @@ main { padding: 0 var(--margin); }
     verifications: [], generations: [],
     result: status === 'done' ? {
       snapshotDir: '', title: source.replace('https://', ''), viewports: [1440, 768, 375],
-      screenshots: { '1440': 'demo/capture.jpg' }, assetsOk: 12, assetsFailed: 1, dynamicRegions: 0,
+      screenshots: { '1440': 'demo/capture.jpg', '768': 'demo/capture-768.jpg' }, assetsOk: 12, assetsFailed: 1, dynamicRegions: 0,
       dismissed: 0, domNodes: 640, durationMs: 4100,
     } : undefined,
     sizeBytes: status === 'done' ? 2400000 : 0,
@@ -243,7 +257,7 @@ main { padding: 0 var(--margin); }
         },
       }],
       generations: [],
-      result: { snapshotDir: '', title: 'Fixture · 定价页', viewports: [1440, 768, 375], screenshots: { '1440': 'demo/capture.jpg' }, assetsOk: 41, assetsFailed: 3, dynamicRegions: 0, dismissed: 1, domNodes: 1873, durationMs: 6100 },
+      result: { snapshotDir: '', title: 'Fixture · 定价页', viewports: [1440, 768, 375], screenshots: { '1440': 'demo/capture.jpg', '768': 'demo/capture-768.jpg' }, assetsOk: 41, assetsFailed: 3, dynamicRegions: 0, dismissed: 1, domNodes: 1873, durationMs: 6100 },
       sizeBytes: 18432000,
     },
     {
@@ -291,7 +305,7 @@ main { padding: 0 var(--margin); }
 
   // ---------- auth ----------
   function renderAuth() {
-    $('#sidebar').innerHTML = `
+    const authHtml = `
       <div class="auth">
         <div>
           <h1 class="mask"><span>把网页读成代码。</span></h1>
@@ -334,7 +348,7 @@ main { padding: 0 var(--margin); }
         <div id="auth-notice"></div>
       </div>`
 
-    $('#detail').innerHTML = `
+    const proofHtml = `
       <div class="proof">
         <p class="enter">不用登录就能看的东西：这是工具链自己的输出。左边是原站截图，右边是同一视口下还原页的截图，下面是两边的像素差异热力图。</p>
         <div class="halves enter">
@@ -362,6 +376,7 @@ main { padding: 0 var(--margin); }
         </div>
       </div>`
 
+    $('#page').innerHTML = `<div class="auth-wrap">${authHtml}<div class="proof-wrap">${proofHtml}</div></div>`
     $('#whoami').textContent = ''
     $('#logout').hidden = true
     $('#tab-admin').hidden = true
@@ -434,30 +449,204 @@ main { padding: 0 var(--margin); }
       show('login')
     }
 
-    observeEntrances($('#sidebar'))
-    observeEntrances($('#detail'))
-    fillBars($('#detail'))
+    observeEntrances($('#page'))
+    fillBars($('#page'))
     revealMasked()
   }
 
-  // ---------- ledger ----------
-  function renderSidebar() {
-    const totals = state.me?.totals ?? { tasks: 0, storageBytes: 0 }
-    const quota = state.me?.quota
-    const quotaLine = quota ? `本机配额 ${totals.tasks}/${quota.maxTasks} 任务 · ${fmtBytes(totals.storageBytes)}` : ''
-    $('#sidebar').innerHTML = `
-      <section class="intro">
-        <h1 class="mask"><span>捕获一个页面，</span></h1>
-        <h1 class="mask"><span>读回它的代码。</span></h1>
-        <p>Kloon 把可访问的页面读成结构、样式与资产，收敛到像素级一致，产出可运行的 React + Tailwind 工程。</p>
-        ${quotaLine ? `<p style="margin-top:10px;color:var(--muted);font-size:var(--step-small)">${esc(quotaLine)}</p>` : ''}
-      </section>
+  // ---------- routing ----------
+  //   /app             任务列表(默认)
+  //   /app/new         新建任务表单
+  //   /app/tasks/:id   任务详情(进行中 / 已完成)
+  //   /app/admin       管理台
+  // The router paints a route once and then patches it in place: a running task
+  // must never rebuild the DOM (that is what made the old console flicker and
+  // reload screenshots on every event).
+  function currentRoute() {
+    const p = (location.pathname.replace(/\/+$/, '') || '/app')
+    if (p.startsWith('/app/tasks/')) {
+      const id = decodeURIComponent(p.slice('/app/tasks/'.length))
+      if (id) return { name: 'task', id }
+    }
+    if (p === '/app/new') return { name: 'new' }
+    if (p === '/app/admin') return { name: 'admin' }
+    return { name: 'list' }
+  }
+  const taskUrl = (id) => `/app/tasks/${encodeURIComponent(id)}`
 
-      <form class="capture" id="new-task" data-ui>
+  // what is currently painted, and what the last content build was based on
+  const view = { name: null, id: null, sig: '' }
+
+  function navigate(path, replace = false) {
+    if (location.pathname + location.search === path) { sync(); return }
+    history[replace ? 'replaceState' : 'pushState']({}, '', path)
+    sync()
+  }
+
+  /** paint a route for the first time, or patch the one already on screen */
+  function sync(opts = {}) {
+    if (!state.me) return // the auth screen owns the page until there is a session
+    const r = currentRoute()
+    const fresh = r.name !== view.name || r.id !== view.id
+    if (fresh || opts.force) {
+      view.name = r.name
+      view.id = r.id ?? null
+      if (fresh) view.sig = ''
+      paint(r)
+      return
+    }
+    patch(r)
+  }
+
+  function paint(r) {
+    const page = $('#page')
+    if (r.name === 'list') return paintList(page)
+    if (r.name === 'new') return paintNew(page)
+    if (r.name === 'admin') return paintAdmin(page)
+    return paintTask(page, r.id)
+  }
+
+  function patch(r) {
+    if (r.name === 'list') return patchList()
+    if (r.name === 'task') return patchTask()
+    // /app/new and /app/admin hold user input: patching them would fight the typist
+  }
+
+  const findTask = (id) => state.tasks.find((t) => t.id === id)
+  const setText = (el, text) => { if (el && el.textContent !== text) el.textContent = text }
+  const setClass = (el, name) => { if (el && el.className !== name) el.className = name }
+  const setWidth = (el, pct) => {
+    if (!el) return
+    const next = `${pct}%`
+    if (el.style.width !== next) el.style.width = next
+  }
+  const setSrc = (img, src) => { if (img && src && img.getAttribute('src') !== src) img.src = src }
+
+  // ---------- progress ----------
+  // The worker reports free-form lines; map the stage words it prints onto a
+  // monotonic bar so a running task shows motion instead of a blinking screen.
+  const STAGES = [
+    [/viewport .*loading|开始加载/, 8, '打开页面'],
+    [/meta pass|滚动/, 26, '读取结构与样式'],
+    [/dynamic:/, 40, '检测动态区域'],
+    [/viewport .*done|截图/, 52, '截图'],
+    [/assets:/, 66, '下载资产'],
+    [/states: done/, 74, '交互态捕获'],
+    [/interactions:/, 82, '交互发现'],
+    [/charts:/, 88, '图表快照'],
+  ]
+  function progressOf(t) {
+    if (t.status === 'done') return { pct: 100, label: '完成' }
+    const lines = (t.progress ?? []).map((p) => p.message).join('\n')
+    let pct = t.status === 'queued' ? 4 : 6
+    let label = t.status === 'queued' ? '排队中' : '准备中'
+    for (const [re, at, name] of STAGES) {
+      if (re.test(lines) && at > pct) { pct = at; label = name }
+    }
+    if (t.status === 'failed') label = '已失败'
+    return { pct, label }
+  }
+
+  // ---------- list ----------
+  function taskRow(t) {
+    const shot = t.result?.screenshots?.[String(t.result?.viewports?.[0])] ?? ''
+    const metric = t.result?.metrics ?? t.verifications?.at(-1)?.result?.metrics
+    const li = document.createElement('li')
+    li.innerHTML = `
+      <a class="task-row enter" href="${taskUrl(t.id)}" data-id="${esc(t.id)}">
+        <span class="thumb">${shot ? `<img src="${esc(artifactUrl(t, shot))}" alt="${esc(t.input.source)} 的捕获截图" width="320" height="200" loading="lazy" />` : ''}</span>
+        <span class="name">${esc(t.input.source)}</span>
+        <span class="kind">${esc(t.id)} · ${fmtTime(t.createdAt)}</span>
+        <span class="metric"><b class="state ${t.status}" data-role="status">${STATUS[t.status]}</b><span data-role="metric">${metric ? `SSIM ${metric.ssim}` : ''}</span></span>
+        <span class="row-progress" data-role="row-progress" hidden><i></i></span>
+      </a>`
+    return li
+  }
+
+  function paintList(page) {
+    page.innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1 class="mask"><span>任务</span></h1>
+          <p class="page-note enter" id="list-note"></p>
+        </div>
+        <a class="action enter" href="/app/new" id="create-btn">新建任务</a>
+      </div>
+      <ul class="tasks enter" id="tasks"></ul>
+      <p class="empty" id="tasks-empty" hidden>还没有任务。点上面「新建任务」开始。</p>`
+    observeEntrances(page)
+    fillBars(page)
+    revealMasked()
+    patchList()
+    page.querySelector('#create-btn').onclick = (e) => { e.preventDefault(); navigate('/app/new') }
+  }
+
+  function patchList() {
+    const ul = $('#tasks')
+    if (!ul) return
+    const known = new Map([...ul.children].map((li) => [li.dataset.id ?? li.querySelector('.task-row')?.dataset.id, li]))
+    const note = $('#list-note')
+    const running = state.tasks.filter((t) => t.status === 'running' || t.status === 'queued').length
+    setText(note, state.tasks.length ? `共 ${state.tasks.length} 个${running ? ` · ${running} 个进行中` : ''}` : '')
+    const empty = $('#tasks-empty')
+    if (empty) empty.hidden = state.tasks.length > 0
+
+    // add or move rows in order, patch the text in place (no innerHTML reset, so
+    // screenshots and scroll position stay put)
+    state.tasks.forEach((t, i) => {
+      let li = known.get(t.id)
+      if (!li) {
+        li = taskRow(t)
+        li.dataset.id = t.id
+        const row = li.querySelector('.task-row')
+        row.addEventListener('click', (e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+          e.preventDefault()
+          navigate(row.getAttribute('href'))
+        })
+      } else {
+        known.delete(t.id)
+        const badge = li.querySelector('[data-role=status]')
+        setText(badge, STATUS[t.status])
+        setClass(badge, `state ${t.status}`)
+        const metric = t.result?.metrics ?? t.verifications?.at(-1)?.result?.metrics
+        const meter = li.querySelector('[data-role=metric]')
+        setText(meter, metric ? `SSIM ${metric.ssim}` : '')
+        const live = t.status === 'running' || t.status === 'queued'
+        const rp = li.querySelector('[data-role=row-progress]')
+        if (rp) {
+          rp.hidden = !live
+          if (live) setWidth(rp.querySelector('i'), progressOf(t).pct)
+        }
+        const img = li.querySelector('.thumb img')
+        const shot = t.result?.screenshots?.[String(t.result?.viewports?.[0])] ?? ''
+        if (shot && img) setSrc(img, artifactUrl(t, shot))
+        else if (shot && !img) {
+          li.querySelector('.thumb').innerHTML = `<img src="${esc(artifactUrl(t, shot))}" alt="${esc(t.input.source)} 的捕获截图" width="320" height="200" loading="lazy" />`
+        }
+      }
+      if (ul.children[i] !== li) ul.insertBefore(li, ul.children[i] ?? null)
+    })
+    // rows the server no longer reports
+    for (const stale of known.values()) stale.remove()
+    observeEntrances(ul)
+  }
+
+  // ---------- new ----------
+  function paintNew(page) {
+    page.innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1 class="mask"><span>新建任务</span></h1>
+          <p class="page-note enter">填一个可公开访问的地址。捕获在后台跑，可以关掉这个页面。</p>
+        </div>
+        <div class="head-actions enter"><a class="back" href="/app" id="cancel-btn">← 任务列表</a></div>
+      </div>
+      <form class="capture" id="new-task">
         <div class="capture-row enter">
           <div class="grow">
             <label for="source">页面地址</label>
-            <input type="text" id="source" placeholder="https://example.com" required />
+            <input type="text" id="source" placeholder="https://example.com" required autofocus />
           </div>
           <label for="type">类型
             <select id="type"><option value="url">网址</option><option value="image">图片路径</option><option value="video">视频路径</option></select>
@@ -471,20 +660,14 @@ main { padding: 0 var(--margin); }
           <label><input type="checkbox" id="dynamic" checked /> 动态区域检测</label>
           <label><input type="checkbox" id="states" /> 交互态捕获（慢）</label>
         </div>
-        <div class="enter"><button class="action" type="submit" id="submit">开始捕获</button></div>
-      </form>
-
-      <div>
-        <div class="section-head"><h2>任务账本</h2><span class="count" id="ledger-count"></span></div>
-        <div class="ledger">
-          <ul id="tasks"></ul>
-          <div class="preview" id="preview" aria-hidden="true"><img alt="" id="preview-img" /></div>
+        <div class="form-actions enter">
+          <button class="action enter" type="submit" id="submit">开始捕获</button>
+          <span class="quiet">提交后跳到该任务的详情页。</span>
         </div>
-      </div>`
-    renderTasks()
-    fillBars($('#sidebar'))
-    observeEntrances($('#sidebar'))
-
+      </form>`
+    observeEntrances(page)
+    revealMasked()
+    page.querySelector('#cancel-btn').onclick = (e) => { e.preventDefault(); navigate('/app') }
     $('#new-task').onsubmit = async (e) => {
       e.preventDefault()
       const btn = $('#submit')
@@ -500,56 +683,9 @@ main { padding: 0 var(--margin); }
         const res = await api('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || res.statusText)
-        upsert(data.task); state.selected = data.task.id
-        renderTasks(); renderDetail()
+        upsert(data.task)
+        navigate(taskUrl(data.task.id)) // the new task opens on its own page
       } catch (err) { banner(err.message) } finally { btn.disabled = false }
-    }
-  }
-
-  function renderTasks() {
-    const el = $('#tasks')
-    if (!el) return
-    const n = state.tasks.length
-    const count = $('#ledger-count')
-    if (count) count.textContent = n ? `${n} 个` : ''
-    if (!n) { el.innerHTML = '<li><p class="empty">还没有任务。在上面填一个地址开始。</p></li>'; return }
-    el.innerHTML = state.tasks.map((t, i) => {
-      const rawShot = t.result?.screenshots?.[String(t.result?.viewports?.[0])] ?? ''
-      const shot = rawShot ? artifactUrl(t, rawShot) : ''
-      const metric = t.result?.metrics ?? t.verifications?.at(-1)?.result?.metrics
-      const thumb = shot && i < 3 ? `<span class="thumb"><img src="${esc(shot)}" alt="任务 ${esc(t.input.source)} 的捕获截图" width="640" height="400" /></span>` : ''
-      return `<li>
-        <button class="row enter ${state.selected === t.id ? 'selected' : ''}" data-id="${t.id}" data-shot="${esc(shot)}">
-          ${thumb}
-          <span class="name">${esc(t.input.source)}</span>
-          <span class="kind">${esc(t.id)} · ${fmtTime(t.createdAt)}</span>
-          <span class="metric"><b class="state ${t.status}">${STATUS[t.status]}</b>${metric ? `<span>SSIM ${metric.ssim}</span>` : ''}</span>
-        </button>
-      </li>`
-    }).join('')
-    observeEntrances(el)
-
-    const preview = $('#preview')
-    const previewImg = $('#preview-img')
-    for (const row of el.querySelectorAll('.row')) {
-      row.onclick = () => { state.selected = row.dataset.id; renderTasks(); renderDetail() }
-      if (!preview) continue
-      row.addEventListener('pointerenter', () => {
-        const src = row.dataset.shot
-        if (!src) return
-        previewImg.src = src
-        preview.style.top = row.offsetTop + 'px'
-        preview.classList.add('on')
-      })
-      row.addEventListener('pointerleave', () => preview.classList.remove('on'))
-      row.addEventListener('focus', () => {
-        const src = row.dataset.shot
-        if (!src) return
-        previewImg.src = src
-        preview.style.top = row.offsetTop + 'px'
-        preview.classList.add('on')
-      })
-      row.addEventListener('blur', () => preview.classList.remove('on'))
     }
   }
 
@@ -569,8 +705,8 @@ main { padding: 0 var(--margin); }
   }
 
   function renderGenerations(t) {
-    if (t.status !== 'done') return ''
     const runs = [...(t.generations || [])].reverse()
+    if (t.status !== 'done') return ''
     if (!runs.length) return `
       <section class="detail-block enter">
         <div class="section-head" style="margin:0 0 18px"><h2>自动生成</h2></div>
@@ -590,7 +726,7 @@ main { padding: 0 var(--margin); }
                 <span class="verdict"><span class="state ${g.status}">${VSTATUS[g.status]}</span>${g.finalDecision ? ' · ' + esc(DECISION[g.finalDecision] || g.finalDecision) : ''}</span>
                 <span class="when">${esc(g.id)} · ${fmtTime(g.createdAt)}</span>
               </div>
-              ${g.error ? `<p style="color:var(--accent);font-size:var(--step-small);margin-top:12px">${esc(g.error)}</p>` : ''}
+              ${g.error ? `<p style="color:var(--danger);font-size:var(--step-small);margin-top:12px">${esc(g.error)}</p>` : ''}
               ${g.rounds?.length ? `<div class="run-body">${g.rounds.map((r) => `<p style="font-size:var(--step-small)">第 ${r.round} 轮 · ${esc(DECISION[r.decision] || r.decision)} · SSIM ${r.metrics.ssim} · 像素差异 ${r.metrics.pixelDiffPct}%</p>`).join('')}</div>` : ''}
               ${g.progress?.length ? `<pre class="log compact">${esc(g.progress.slice(-30).map((p) => `${fmtTime(p.at)}  ${p.message}`).join('\n'))}</pre>` : ''}
             </article>`).join('')}
@@ -599,7 +735,6 @@ main { padding: 0 var(--margin); }
   }
 
   function renderVerifications(t) {
-    if (t.status !== 'done') return ''
     const runs = [...(t.verifications || [])].reverse()
     const rows = runs.map((v) => {
       const r = v.result
@@ -618,7 +753,7 @@ main { padding: 0 var(--margin); }
           <span class="verdict"><span class="state ${v.status}">${VSTATUS[v.status]}</span>${r ? ' · ' + esc(DECISION[r.decision] || r.decision) : ''}</span>
           <span class="when">${fmtTime(v.createdAt)}</span>
         </div>
-        ${v.error ? `<p style="color:var(--accent);font-size:var(--step-small);margin-top:12px;white-space:pre-wrap">${esc(v.error)}</p>` : ''}
+        ${v.error ? `<p style="color:var(--danger);font-size:var(--step-small);margin-top:12px;white-space:pre-wrap">${esc(v.error)}</p>` : ''}
         <div class="run-body">${links}${entries}${v.progress.length ? `<pre class="log compact">${esc(v.progress.map((p) => `${fmtTime(p.at)}  ${p.message}`).join('\n'))}</pre>` : ''}</div>
       </article>`
     }).join('')
@@ -626,7 +761,7 @@ main { padding: 0 var(--margin); }
       ? `<p style="color:var(--muted);font-size:var(--step-small);margin-bottom:18px">收敛历史 ${t.loop.history.map((h, i) => `r${i + 1} ${h.ssim}/${h.pixelDiffPct}%`).join(' → ')}${t.loop.escalated ? ' · 已升级诊断' : ''}</p>`
       : ''
     return `
-      <section class="detail-block enter">
+      <section class="detail-block enter" id="verify-block">
         <div class="section-head" style="margin:0 0 18px"><h2>验证还原页</h2><span class="count">${runs.length} 轮</span></div>
         <form class="admin-forms" id="verify-form" data-ui>
           <div class="row">
@@ -642,91 +777,192 @@ main { padding: 0 var(--margin); }
       </section>`
   }
 
-  function renderDetail() {
-    const el = $('#detail')
-    if (state.view === 'admin') { renderAdmin(el); return }
-    const t = state.tasks.find((x) => x.id === state.selected)
-    if (!t) { el.innerHTML = '<p class="empty">创建或选择一个任务查看详情。</p>'; return }
-    const keepPath = $('#verify-path')?.value ?? ''
-    const r = t.result
-    const vp = r?.viewports?.[0] ?? t.options?.viewports?.[0] ?? 1440
-    const shot = r?.screenshots?.[String(vp)] ?? ''
-    const verificationMetrics = t.verifications?.at(-1)?.result?.metrics
-    const lastVerify = t.verifications?.at(-1)
-
-    const reproSrc = lastVerify ? fileUrl(t, 'verifications/' + lastVerify.id + '/repro-snap/screenshots/' + vp + '.png') : ''
-    const heatSrc = lastVerify?.result?.heatmaps?.[0] ? fileUrl(t, 'verifications/' + lastVerify.id + '/' + lastVerify.result.heatmaps[0]) : ''
-    const halves = shot ? `
-      <div class="halves enter">
-        <figure>
-          <figcaption>输入 · 原站截图 ${vp}px</figcaption>
-          <div class="frame"><img src="${artifactUrl(t, shot)}" alt="原站 ${esc(t.input.source)} 在 ${vp}px 下的捕获" width="1440" height="900" /></div>
-        </figure>
-        <figure>
-          <figcaption>输出 · 还原页同视口</figcaption>
-          <div class="frame">${reproSrc ? `<img src="${reproSrc}" alt="还原页在 ${vp}px 下的截图" width="1440" height="900" />` : '<p class="empty" style="padding:28px 16px">提交还原工程后在这里出现对照。</p>'}</div>
-        </figure>
-      </div>${heatSrc ? `
-      <figure class="band enter">
-        <figcaption>差异热力图 · 红色为像素差异，蓝色为被排除的动态区域</figcaption>
-        <div class="frame"><img src="${heatSrc}" alt="原站与还原页的像素差异热力图" width="1440" height="900" /></div>
-      </figure>` : ''}` : ''
-
-    const facts = [
-      r?.title ? ['页面标题', esc(r.title)] : null,
-      ['状态', `<span class="state ${t.status}">${STATUS[t.status]}</span>`],
-      ['视口', (r?.viewports ?? t.options?.viewports ?? []).join(' / ') || '默认'],
-      r ? ['DOM 节点', r.domNodes ?? '-'] : null,
-      r ? ['资产', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`] : null,
-      r ? ['动态区域', `${r.dynamicRegions} 处`] : null,
-      r ? ['自动关闭弹窗', r.dismissed] : null,
-      r ? ['耗时', fmtDuration(r.durationMs)] : null,
-      t.worker?.pid ? ['Worker PID', t.worker.pid] : null,
-      t.sizeBytes ? ['占用', fmtBytes(t.sizeBytes)] : null,
-    ].filter(Boolean)
-
-    const progress = t.progress.length ? t.progress.map((p) => `${fmtTime(p.at)}  ${p.message}`).join('\n') : '（等待进度输出…）'
-
-    el.innerHTML = `
-      <div class="detail-block enter">
-        <div class="detail-head">
-          <h3>${esc(t.input.source)}</h3>
-          <span class="id">${esc(t.id)}</span>
-          ${t.status === 'done' || t.status === 'failed' ? '<button class="action danger small" id="delete-task" style="margin-left:auto">删除任务</button>' : ''}
+  function paintTask(page, id) {
+    const t = findTask(id)
+    if (!t) {
+      page.innerHTML = `
+        <div class="page-head">
+          <h1 class="mask"><span>找不到任务</span></h1>
+          <div class="head-actions"><a class="back" href="/app" id="back-btn">← 任务列表</a></div>
         </div>
-        ${halves}
-        ${figures(t, verificationMetrics)}
-        <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
-        ${t.error ? `<p style="color:var(--accent);font-size:var(--step-small);margin-top:20px;white-space:pre-wrap">${esc(t.error)}</p>` : ''}
+        <p class="empty">这个任务可能已经被删除了。</p>`
+      page.querySelector('#back-btn').onclick = (e) => { e.preventDefault(); navigate('/app') }
+      return
+    }
+    page.innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1 class="mask" title="${esc(t.input.source)}"><span>${esc(t.input.source)}</span></h1>
+          <p class="page-note enter"><span class="state ${t.status}" id="task-status">${STATUS[t.status]}</span> · <span class="id">${esc(t.id)}</span></p>
+        </div>
+        <div class="head-actions enter">
+          <a class="back" href="/app" id="back-btn">← 任务列表</a>
+          <button class="action danger small" id="delete-task">删除任务</button>
+        </div>
       </div>
 
-      <section class="detail-block enter">
-        <div class="section-head" style="margin:0 0 18px"><h2>捕获过程</h2></div>
-        <pre class="log" id="log">${esc(progress)}</pre>
+      <div id="result-block"></div>
+
+      <section class="detail-block enter" id="log-block">
+        <div class="section-head enter" style="margin:0 0 18px"><h2>捕获过程</h2><span class="count" id="log-count"></span></div>
+        <div id="progress-block">
+          <div class="progress" role="progressbar" aria-label="捕获进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progress-bar"></i></div>
+          <p class="progress-note enter" id="progress-note">准备中</p>
+        </div>
+        <pre class="log enter" id="log" aria-live="polite"></pre>
       </section>
 
-      ${renderGenerations(t)}
-      ${renderVerifications(t)}`
+      <div id="generation-block"></div>
+      <div id="verify-block-wrap"></div>`
 
-    if (keepPath && $('#verify-path')) $('#verify-path').value = keepPath
-    observeEntrances(el)
-    fillBars(el)
-    wireGeneration(t)
-    wireVerification(t)
-    const del = $('#delete-task')
-    if (del) del.onclick = async () => {
+    page.querySelector('#back-btn').onclick = (e) => { e.preventDefault(); navigate('/app') }
+    $('#delete-task').onclick = async () => {
       if (!confirm('删除该任务及其全部产物？')) return
-      if (DEMO) { state.tasks = state.tasks.filter((x) => x.id !== t.id); state.selected = state.tasks[0]?.id ?? null; renderTasks(); renderDetail(); return }
+      if (DEMO) { state.tasks = state.tasks.filter((x) => x.id !== t.id); navigate('/app', true); return }
       try {
         const res = await api(`/api/tasks/${t.id}`, { method: 'DELETE' })
         if (!res.ok) throw new Error(((await res.json()) || {}).error || res.statusText)
         state.tasks = state.tasks.filter((x) => x.id !== t.id)
-        state.selected = state.tasks[0]?.id ?? null
-        renderTasks(); renderDetail()
+        navigate('/app', true)
       } catch (err) { banner(err.message) }
     }
+    observeEntrances(page)
+    fillBars(page)
+    revealMasked()
+    patchTask(true)
+  }
+
+  /** content signature: rebuild the heavy sections only when their data changed */
+  const taskSig = (t) => [
+    t.status,
+    t.result ? 'r' : '-',
+    t.verifications?.length ?? 0,
+    (t.verifications ?? []).map((v) => v.status).join(','),
+    t.generations?.length ?? 0,
+    (t.generations ?? []).map((g) => g.status).join(','),
+    !!t.error,
+  ].join('|')
+
+  function patchTask(forceContent = false) {
+    const r = currentRoute()
+    const t = r.name === 'task' ? findTask(r.id) : null
+    if (!t) return
+
+    // status + progress: cheap, updated on every tick
+    setText($('#task-status'), STATUS[t.status])
+    setClass($('#task-status'), `state ${t.status}`)
+    const { pct, label } = progressOf(t)
+    const bar = $('#progress-bar')
+    setWidth(bar, pct)
+    const track = bar?.parentElement
+    if (track) track.setAttribute('aria-valuenow', String(pct))
+    const elapsed = t.result?.durationMs ?? (t.startedAt ? Date.now() - new Date(t.startedAt).getTime() : null)
+    const live = t.status === 'running' || t.status === 'queued'
+    setText($('#progress-note'), `${label} · ${pct}%${t.status === 'running' && elapsed ? ` · ${fmtDuration(elapsed)}` : ''}${live ? ' · 跑在服务端，可以关掉页面回来看' : ''}`)
+
+    // log: append only the lines that are new (streaming, never re-rendered)
     const log = $('#log')
-    if (log) log.scrollTop = log.scrollHeight
+    if (log) {
+      const lines = (t.progress ?? []).map((p) => `${fmtTime(p.at)}  ${p.message}`)
+      const painted = Number(log.dataset.count ?? '0')
+      const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 24
+      const empty = typeof log.dataset.count === 'undefined'
+      if (empty) log.innerHTML = ''
+      if (lines.length > painted) {
+        const frag = document.createDocumentFragment()
+        for (const line of lines.slice(painted)) {
+          const span = document.createElement('span')
+          span.className = 'log-line'
+          span.textContent = line + '\n'
+          frag.appendChild(span)
+        }
+        log.appendChild(frag)
+        log.dataset.count = String(lines.length)
+        setText($('#log-count'), `${lines.length} 行`)
+      }
+      if (!lines.length && !log.textContent.trim()) {
+        const span = document.createElement('span')
+        span.className = 'log-line'
+        span.textContent = t.status === 'done'
+          ? `捕获完成 · 用时 ${fmtDuration(t.result?.durationMs ?? 0)}`
+          : t.status === 'failed'
+            ? '任务失败，原因见上方。'
+            : '（等待进度输出…）'
+        log.appendChild(span)
+        log.dataset.count = '0'
+      }
+      if (atBottom) log.scrollTop = log.scrollHeight
+    }
+
+    // heavy content: full rebuild only when its signature changed
+    const sig = taskSig(t)
+    if (forceContent || view.sig !== sig) {
+      view.sig = sig
+      renderResultBlock(t)
+      $('#generation-block').innerHTML = renderGenerations(t)
+      $('#verify-block-wrap').innerHTML = renderVerifications(t)
+      observeEntrances($('#result-block'))
+      observeEntrances($('#verify-block-wrap'))
+      fillBars($('#result-block'))
+      wireGeneration(t)
+      wireVerification(t)
+    }
+  }
+
+  function renderResultBlock(t) {
+    const el = $('#result-block')
+    if (!el) return
+    const r = t.result
+    if (!r) {
+      el.innerHTML = t.error
+        ? `<section class="detail-block enter"><div class="section-head" style="margin:0 0 14px"><h2>失败原因</h2><span class="state failed">失败</span></div><pre class="log">${esc(t.error)}</pre></section>`
+        : ''
+      return
+    }
+    const vp = r.viewports?.[0] ?? t.options?.viewports?.[0] ?? 1440
+    const shot = r.screenshots?.[String(vp)] ?? ''
+    const lastVerify = t.verifications?.at(-1)
+    const reproSrc = lastVerify ? fileUrl(t, 'verifications/' + lastVerify.id + '/repro-snap/screenshots/' + vp + '.png') : ''
+    const heatSrc = lastVerify?.result?.heatmaps?.[0] ? fileUrl(t, 'verifications/' + lastVerify.id + '/' + lastVerify.result.heatmaps[0]) : ''
+    const metrics = t.verifications?.at(-1)?.result?.metrics
+    const vp2 = r.viewports?.[1]
+    const shot2 = vp2 ? r.screenshots?.[String(vp2)] : ''
+    const facts = [
+      ['页面地址', `<span class="wrap-any">${esc(t.input.source)}</span>`],
+      r.title ? ['页面标题', esc(r.title)] : null,
+      ['状态', `<span class="state ${t.status}">${STATUS[t.status]}</span>`],
+      ['视口', (r.viewports ?? t.options?.viewports ?? []).join(' / ') || '默认'],
+      ['DOM 节点', r.domNodes ?? '-'],
+      ['资产', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`],
+      ['动态区域', `${r.dynamicRegions} 处`],
+      ['自动关闭弹窗', r.dismissed],
+      ['耗时', fmtDuration(r.durationMs)],
+      t.worker?.pid ? ['Worker PID', t.worker.pid] : null,
+      t.sizeBytes ? ['占用', fmtBytes(t.sizeBytes)] : null,
+    ].filter(Boolean)
+    el.innerHTML = `
+      <section class="detail-block enter">
+        ${shot ? `<div class="halves enter">
+          <figure>
+            <figcaption>输入 · 原站截图 ${vp}px</figcaption>
+            <div class="frame"><img src="${artifactUrl(t, shot)}" alt="原站 ${esc(t.input.source)} 在 ${vp}px 下的捕获" width="1440" height="900" /></div>
+          </figure>
+          <figure>
+            <figcaption>输出 · 还原页同视口</figcaption>
+            <div class="frame">${reproSrc ? `<img src="${reproSrc}" alt="还原页在 ${vp}px 下的截图" width="1440" height="900" />` : '<p class="empty" style="padding:28px 16px">提交还原工程后在这里出现对照。</p>'}</div>
+          </figure>
+        </div>${heatSrc ? `
+        <figure class="band enter">
+          <figcaption>差异热力图 · 红色为像素差异，蓝色为被排除的动态区域</figcaption>
+          <div class="frame"><img src="${heatSrc}" alt="原站与还原页的像素差异热力图" width="1440" height="900" /></div>
+        </figure>` : ''}
+        ${shot2 ? `<figure class="band enter">
+          <figcaption>第二个视口 · ${vp2}px 下的捕获</figcaption>
+          <div class="frame auto"><img src="${artifactUrl(t, shot2)}" alt="原站 ${esc(t.input.source)} 在 ${vp2}px 下的捕获" width="900" height="1200" /></div>
+        </figure>` : ''}` : ''}
+        ${figures(t, metrics)}
+        <dl class="facts">${facts.map(([k, v]) => `<div class="enter"><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+      </section>`
   }
 
   function wireGeneration(t) {
@@ -738,7 +974,8 @@ main { padding: 0 var(--margin); }
         const res = await api(`/api/tasks/${t.id}/generate`, { method: 'POST' })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || res.statusText)
-        upsert(data.task); renderTasks(); renderDetail()
+        upsert(data.task)
+        await refresh(true)
       } catch (err) { banner(err.message) } finally { btn.disabled = false }
     }
   }
@@ -753,11 +990,14 @@ main { padding: 0 var(--margin); }
       if (!res.ok) throw new Error(data.error || res.statusText)
       return data
     }
+    // keep a typed path across the rebuild of this block
+    pathInput.value = state.verifyPath ?? ''
+    pathInput.oninput = () => { state.verifyPath = pathInput.value }
     pathBtn.onclick = async () => {
       const source = pathInput.value.trim()
       if (!source) return banner('请先填写还原工程目录。')
       pathBtn.disabled = true
-      try { const data = await post(JSON.stringify({ repro: { type: 'path', source } })); upsert(data.task); renderTasks(); renderDetail() }
+      try { const data = await post(JSON.stringify({ repro: { type: 'path', source } })); upsert(data.task); await refresh(true) }
       catch (err) { banner(err.message) } finally { pathBtn.disabled = false }
     }
     zipBtn.onclick = () => zipInput.click()
@@ -765,9 +1005,22 @@ main { padding: 0 var(--margin); }
       const file = zipInput.files?.[0]
       if (!file) return
       zipBtn.disabled = true
-      try { const data = await post(file, { 'content-type': 'application/zip', 'x-filename': file.name }); upsert(data.task); renderTasks(); renderDetail() }
+      try { const data = await post(file, { 'content-type': 'application/zip', 'x-filename': file.name }); upsert(data.task); await refresh(true) }
       catch (err) { banner(err.message) } finally { zipBtn.disabled = false; zipInput.value = '' }
     }
+  }
+
+  function paintAdmin(page) {
+    page.innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1 class="mask"><span>管理</span></h1>
+          <p class="page-note">用户、封禁、预警与审计。</p>
+        </div>
+      </div>
+      <div id="admin-body"></div>`
+    revealMasked()
+    void renderAdmin($('#admin-body'))
   }
 
   // ---------- admin ----------
@@ -873,21 +1126,20 @@ main { padding: 0 var(--margin); }
   function demoSubmit(source) {
     const next = { ...DEMO_TASKS[1], id: 'demo-' + Date.now().toString(36), input: { type: 'url', source: source || 'https://fixture.local/landing' }, status: 'running', result: undefined, sizeBytes: 0 }
     state.tasks.unshift(next)
-    state.selected = next.id
-    renderTasks(); renderDetail()
+    navigate(taskUrl(next.id))
     setTimeout(() => {
       next.status = 'done'
       next.result = { ...DEMO_TASKS[0].result, screenshots: { '1440': 'demo/capture.jpg' }, title: 'Fixture · 新捕获' }
       next.verifications = DEMO_TASKS[0].verifications
-      upsert(next); renderTasks(); renderDetail()
+      upsert(next)
+      sync()
     }, 2600)
   }
 
   // ---------- boot ----------
   async function loadTasks() {
     if (DEMO) {
-      state.tasks = JSON.parse(JSON.stringify(DEMO_TASKS))
-      state.selected = state.tasks[0].id
+      if (!state.tasks.length) state.tasks = JSON.parse(JSON.stringify(DEMO_TASKS))
       $('#health').textContent = '演示数据'
       return true
     }
@@ -895,9 +1147,20 @@ main { padding: 0 var(--margin); }
     if (res.status === 401) return false
     const data = await res.json()
     state.tasks = data.tasks
-    if (!state.selected || !state.tasks.some((t) => t.id === state.selected)) state.selected = state.tasks[0]?.id ?? null
     $('#health').textContent = `队列 ${data.queue}`
     return true
+  }
+
+  /** reload from the server, then patch what is on screen */
+  async function refresh(force = false) {
+    const ok = await loadTasks().catch(() => false)
+    if (ok) sync({ force })
+  }
+
+  function setTabs() {
+    const r = currentRoute()
+    $('#tab-tasks').classList.toggle('active', r.name !== 'admin')
+    $('#tab-admin').classList.toggle('active', r.name === 'admin')
   }
 
   async function boot() {
@@ -907,7 +1170,15 @@ main { padding: 0 var(--margin); }
       $('#logout').hidden = false
       $('#logout').onclick = () => { location.href = location.pathname }
       $('#tab-admin').hidden = true
-      await loadTasks(); renderSidebar(); renderDetail(); revealMasked(); return
+      const r = currentRoute()
+      if (r.name === 'admin') history.replaceState({}, '', '/app?demo=1')
+      await loadTasks()
+      view.name = null
+      view.id = null
+      setTabs()
+      sync()
+      revealMasked()
+      return
     }
     const meRes = await api('/api/auth/me')
     if (meRes.status === 401) { state.me = null; renderAuth(); return }
@@ -916,37 +1187,45 @@ main { padding: 0 var(--margin); }
     $('#whoami').textContent = `${me.user.email} · ${me.user.plan}${me.user.role === 'admin' ? ' · admin' : ''}`
     $('#logout').hidden = false
     $('#tab-admin').hidden = me.user.role !== 'admin'
-    $('#logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); await boot() }
+    $('#logout').onclick = async () => {
+      await api('/api/auth/logout', { method: 'POST' })
+      state.me = null
+      view.name = null
+      view.id = null
+      await boot()
+    }
     banner('')
     openStream()
-    await loadTasks(); renderSidebar(); renderDetail(); revealMasked()
+    await loadTasks()
+    setTabs()
+    sync()
+    revealMasked()
     const warnings = (me.warnings ?? []).filter((w) => !w.acknowledged)
     if (warnings.length) {
       const w = warnings[0]
       const el = $('#banner')
       el.innerHTML = `<span>注意：${esc(w.message)}</span><button class="action ghost small" id="ack-warning">知道了</button>`
       el.hidden = false
-      $('#ack-warning').onclick = async () => { await api(`/api/warnings/${w.id}/ack`, { method: 'POST' }); await boot() }
+      $('#ack-warning').onclick = async () => { await api(`/api/warnings/${w.id}/ack`, { method: 'POST' }); banner(''); await refresh(true) }
     }
   }
 
-  $('#tab-tasks').onclick = () => { state.view = 'tasks'; $('#tab-tasks').classList.add('active'); $('#tab-admin').classList.remove('active'); renderDetail() }
-  $('#tab-admin').onclick = () => { state.view = 'admin'; $('#tab-admin').classList.add('active'); $('#tab-tasks').classList.remove('active'); renderDetail() }
+  $('#tab-tasks').onclick = () => navigate('/app')
+  $('#tab-admin').onclick = () => navigate('/app/admin')
+  window.addEventListener('popstate', () => { setTabs(); sync() })
 
   // opened after a successful auth (a stream opened before login stays 401 and
   // the UI would never receive live updates)
   let events = null
   function openStream() {
     if (DEMO || events) return
-    const url = '/api/events'
-    events = new EventSource(url)
+    events = new EventSource('/api/events')
     events.addEventListener('task', (ev) => {
-      const task = JSON.parse(ev.data)
-      upsert(task)
-      if (state.view === 'tasks' && state.selected === task.id) renderDetail()
-      renderTasks()
+      upsert(JSON.parse(ev.data))
+      setTabs()
+      sync() // patch in place: status, progress bar, appended log lines
     })
-    events.addEventListener('cleaned', () => { void loadTasks().then(() => { renderTasks(); renderDetail() }) })
+    events.addEventListener('cleaned', () => { void refresh() })
   }
 
   // fallback poll: a console must converge even if the event stream is cut
@@ -954,11 +1233,17 @@ main { padding: 0 var(--margin); }
   setInterval(() => {
     if (DEMO || !state.me || polling) return
     polling = true
-    void loadTasks()
-      .then((ok) => { if (ok) { renderTasks(); if (state.view === 'tasks') renderDetail() } })
-      .catch(() => {})
-      .finally(() => { polling = false })
+    void refresh().finally(() => { polling = false })
   }, 4000)
+
+  // elapsed time ticks locally: no request, no repaint of anything else
+  setInterval(() => {
+    if (!state.me) return
+    const r = currentRoute()
+    if (r.name !== 'task') return
+    const t = findTask(r.id)
+    if (t?.status === 'running') patchTask()
+  }, 1000)
 
   void boot().catch((err) => banner('无法连接服务：' + err.message))
 </script>
