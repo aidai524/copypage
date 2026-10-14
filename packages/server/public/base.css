@@ -132,19 +132,20 @@ input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-o
 
 .stack { display: grid; gap: 16px; }
 
-.mask { display: block; overflow: hidden; }
+/* reveal layers are progressive enhancement: without scripting nothing is hidden */
+  .js .mask { display: block; overflow: hidden; }
 
-.mask > span { display: block; transform: translateY(105%); transition: transform .7s cubic-bezier(.2,.75,.2,1); }
+  .js .mask > span { display: block; transform: translateY(105%); transition: transform .7s cubic-bezier(.2,.75,.2,1); }
 
-.mask.in > span { transform: none; }
+  .js .mask.in > span { transform: none; }
 
-.enter { opacity: 0; transform: translateY(18px); transition: opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1); }
+.js .enter { opacity: 0; transform: translateY(18px); transition: opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1); }
 
-.enter.in { opacity: 1; transform: none; }
+  .js .enter.in { opacity: 1; transform: none; }
 
 @media (prefers-reduced-motion: reduce) {
-    .mask > span { transform: none; transition: none; }
-    .enter { opacity: 1; transform: none; transition: none; }
+    .js .mask > span { transform: none; transition: none; }
+    .js .enter { opacity: 1; transform: none; transition: none; }
     .meter i { transition: none; }
   }
 
