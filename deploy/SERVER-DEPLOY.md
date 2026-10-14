@@ -11,7 +11,7 @@
 |---|---|
 | 系统 | Ubuntu 22.04+ / Debian 12+ / 其他支持 Docker 的 Linux |
 | 规格 | **≥ 2 vCPU / 4 GB 内存 / 40 GB 磁盘**(镜像约 4 GB;单次捕获产物 10~150 MB) |
-| 域名 | `kloon.dev` 的 **A 记录**指向本机公网 IP(`www` 可选) |
+| 域名 | `kloon.dev` 的 **A 记录**指向本机公网 IP;`www` 可选(见附录 G,建议加并 301 到 apex) |
 | 端口 | 安全组/防火墙放行 **80**(证书签发)和 **443** |
 | 账号 | 已注册 Resend,`kloon.dev` 已 **Verified**,有 `re_…` API key |
 
@@ -360,6 +360,51 @@ docker logs plane-app-proxy-1 --tail 5                            # 看是否在
 cd /srv/kloon/deploy && docker compose up -d copypage
 COPYPAGE_CHECK_URL=https://kloon.dev /srv/kloon/deploy/check.sh
 ```
+
+## 附录 G:`www.kloon.dev` 归一到 apex
+
+**DNS 侧(通常不用动)**:`www` 有一条指向本机 IP 的 A 记录即可。生成方式二选一:
+
+| 类型 | 名称 | 值 |
+|---|---|---|
+| A | `www` | 服务器公网 IP(与 apex 相同) |
+| CNAME | `www` | `kloon.dev` |
+
+kloon.dev 的 DNS 托管在 **Porkbun**(`*.ns.porkbun.com`)。查记录:
+`curl -s 'https://dns.google/resolve?name=www.kloon.dev&type=A'`。
+
+**Caddy 侧(本机已在用 Plane 的边缘 Caddy)**:在 `/root/plane-selfhost/plane-app/Caddyfile.ai` 末尾加一个块,
+让 www 以 **301** 跳到 apex(单一规范域名,避免两个地址各存一份内容,也别让登录态落在两个 host 上):
+
+```caddyfile
+# --- Kloon: www 归一到 apex(单一规范域名) ---
+www.kloon.dev {
+	redir https://kloon.dev{uri} permanent   # {uri} 会带上路径与查询串
+}
+```
+
+生效方式(**平滑重载,不重启容器、Plane 不中断**):
+
+```bash
+cd /root/plane-selfhost/plane-app
+cp Caddyfile.ai Caddyfile.ai.bak-$(date +%Y%m%d-%H%M%S)          # 先备份
+docker compose exec -T proxy caddy validate --config /etc/caddy/Caddyfile   # 应输出 Valid configuration
+docker compose exec -T proxy caddy reload   --config /etc/caddy/Caddyfile
+```
+
+验收(本机 DNS 未刷新时用 `--resolve` 直连服务器 IP):
+
+```bash
+curl -s -o /dev/null -w '%{http_code} → %header{location}\n' --resolve www.kloon.dev:443:<IP> https://www.kloon.dev/app
+# 期望:301 → https://kloon.dev/app(路径与 ?查询串 原样保留)
+echo | openssl s_client -connect <IP>:443 -servername www.kloon.dev 2>/dev/null | openssl x509 -noout -subject
+# 期望:subject=CN=www.kloon.dev
+```
+
+证书由 Caddy 自动申请并续期,无需手工操作。若签发卡住,清掉残留锁再重载:
+`rm -f <caddy数据卷>/locks/issue_cert_www.kloon.dev.lock`。
+
+**不想用 www?** 删掉这个块 + 重载即可(apex 不受影响);DNS 记录留着也无害。
 
 ## 附录 E:在 Docker 部署里开启容器沙箱(可选,较复杂)
 
