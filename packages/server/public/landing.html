@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kloon · 把网页读成代码</title>
+<meta name="description" content="输入一个网址，拿回像素级对齐的 React + Tailwind 工程，并附一份相似度报告。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0b0e'/%3E%3Cpath d='M20 44V20h7v10l9-10h8L33 32l11 12h-8l-9-10v10z' fill='%234ade80'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/base.css" />
+<style>
+  /* landing page only: the console styles live with the console */
+  .bar { display: flex; align-items: center; gap: 24px; min-height: 64px; padding: 0 var(--margin); background: var(--bg); }
+  .bar .wordmark { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
+  .bar nav { display: flex; gap: 22px; margin-left: auto; }
+  .bar nav a { color: var(--muted); text-decoration: none; font-size: var(--step-small); }
+  .bar nav a:hover { color: var(--ink); }
+  .bar .action { min-height: 40px; padding: 0 16px; font-size: var(--step-small); text-decoration: none; }
+
+  main { display: block; }
+  section, .hero { padding: 0 var(--margin); }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  .hero { padding-top: clamp(36px, 5vw, 72px); padding-bottom: clamp(40px, 5vw, 80px); }
+  .hero h1 { font-size: clamp(2.4rem, 6.2vw, 6rem); max-width: 20ch; }
+  .hero-sub { margin: 20px 0 0; font-size: var(--step-lead); color: var(--muted); max-width: 46ch; }
+  .cta { display: flex; align-items: center; gap: 22px; margin-top: 28px; flex-wrap: wrap; }
+  .cta .action { min-height: 48px; padding: 0 24px; text-decoration: none; font-size: var(--step-body); }
+  .quiet { color: var(--ink); text-decoration: none; font-size: var(--step-body); }
+  .quiet:hover { color: var(--accent); }
+
+  .compare { position: relative; margin: clamp(32px, 4vw, 56px) 0 0; background: var(--surface); border-radius: var(--radius); overflow: hidden; --split: 50%; }
+  .compare .layer { position: absolute; inset: 0; }
+  .compare .layer img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+  .compare .over { clip-path: inset(0 calc(100% - var(--split)) 0 0); }
+  .compare .stage { position: relative; aspect-ratio: 16 / 10; }
+  .compare .split-range { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; margin: 0; padding: 0 12px; height: 44px; background: none; border: 0; appearance: none; -webkit-appearance: none; }
+  .compare .split-range::-webkit-slider-runnable-track { height: 3px; background: var(--accent); }
+  .compare .split-range::-moz-range-track { height: 3px; background: var(--accent); }
+  .compare .split-range::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -8.5px; border-radius: 50%; background: var(--accent); cursor: ew-resize; }
+  .compare .split-range::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 50%; background: var(--accent); cursor: ew-resize; }
+  .compare .tags { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; }
+  .compare .tags span { background: var(--bg); color: var(--ink); font-size: var(--step-small); padding: 4px 10px; border-radius: var(--radius); }
+  .caption { margin: 12px 0 0; color: var(--ink); font-size: var(--step-body); max-width: 62ch; }
+
+  .figures { margin-top: 26px; }
+  .band-note { margin: 18px 0 0; color: var(--muted); font-size: var(--step-body); max-width: 62ch; }
+
+  .block { padding: clamp(44px, 6vw, 88px) var(--margin); }
+  .block h2 { font-size: var(--step-head); max-width: 22ch; }
+  .split { display: grid; grid-template-columns: 1.05fr 1fr; gap: clamp(24px, 4vw, 56px); align-items: start; margin-top: 30px; }
+  .split dl { margin: 0; display: grid; gap: 22px; }
+  .split dt { font-size: var(--step-body); font-weight: 600; }
+  .split dd { margin: 6px 0 0; color: var(--muted); max-width: 52ch; font-size: var(--step-body); }
+  .split figure { margin: 0; }
+  .split img, .verify img { width: 100%; border-radius: var(--radius); display: block; }
+  .verify { display: grid; grid-template-columns: 1fr 1.15fr; gap: clamp(24px, 4vw, 56px); align-items: start; margin-top: 30px; }
+  .verify ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .verify li { display: flex; justify-content: space-between; gap: 16px; padding: 12px 14px; border-radius: var(--radius); font-size: var(--step-body); }
+  .verify li:nth-child(odd) { background: var(--surface); }
+  .verify li b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .verify p { margin: 20px 0 0; color: var(--muted); max-width: 52ch; font-size: var(--step-body); }
+
+  .code { margin-top: 30px; }
+  pre { margin: 0; padding: 18px; background: var(--surface); border-radius: var(--radius); overflow-x: auto; }
+  pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8125rem; line-height: 1.6; color: var(--ink); }
+  .code .files { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; color: var(--muted); font-size: var(--step-body); }
+  .code .files li::before { content: "→ "; color: var(--accent); }
+
+  .try { background: var(--surface); border-radius: var(--radius); margin: 0 var(--margin) clamp(40px, 5vw, 72px); padding: clamp(28px, 4vw, 48px); }
+  .try h2 { font-size: var(--step-head); max-width: 22ch; }
+  .try p { margin: 14px 0 22px; color: var(--muted); max-width: 52ch; font-size: var(--step-body); }
+  .try .action { min-height: 48px; padding: 0 24px; text-decoration: none; font-size: var(--step-body); }
+
+  footer { padding: clamp(36px, 5vw, 64px) var(--margin) 48px; }
+  footer .mark { font-size: clamp(2.6rem, 9vw, 7rem); font-weight: 600; letter-spacing: -0.045em; line-height: 0.95; color: var(--ink); }
+  footer .links { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; }
+  footer .links a { color: var(--ink); text-decoration: none; font-size: var(--step-small); }
+  footer .links a:hover { color: var(--accent); }
+  footer .note { margin: 18px 0 0; color: var(--muted); font-size: var(--step-body); max-width: 62ch; }
+
+  @media (max-width: 860px) {
+    .split, .verify { grid-template-columns: 1fr; }
+    .bar nav { display: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#how">跳到正文</a>
+
+<header class="bar">
+  <a class="wordmark" href="/">Kloon</a>
+  <nav aria-label="页面导航">
+    <a href="#how">怎么工作</a>
+    <a href="#verify">验证</a>
+    <a href="#output">产物</a>
+  </nav>
+  <a class="action" href="/app">登录 / 注册</a>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <h1 class="mask"><span>把网页读成代码。</span></h1>
+      <p class="hero-sub enter">输入一个网址，拿回像素级对齐的 React + Tailwind 工程，并附上一份相似度报告。</p>
+      <div class="cta enter">
+        <a class="action" href="/app">开始捕获</a>
+        <a class="quiet" href="#how">看它怎么工作</a>
+      </div>
+
+      <figure class="compare enter" id="compare">
+        <div class="stage">
+          <div class="layer under"><img src="/demo/repro.jpg" alt="还原页在 1440px 视口下的截图" width="1200" height="750" /></div>
+          <div class="layer over"><img src="/demo/capture.jpg" alt="原站在 1440px 视口下的截图" width="1200" height="750" /></div>
+          <div class="tags"><span>原站</span><span>还原页</span></div>
+        </div>
+        <input class="split-range" id="split" type="range" min="0" max="100" value="50" aria-label="拖动比较原站与还原页的截图" />
+      </figure>
+      <div class="figures enter">
+        <div class="figure pass"><b>0.9997</b><span>结构相似度 SSIM</span><div class="meter"><i data-pct="100"></i></div></div>
+        <div class="figure pass"><b>0.03%</b><span>像素差异</span><div class="meter"><i data-pct="8"></i></div></div>
+        <div class="figure"><b>6.1s</b><span>一轮捕获耗时</span><div class="meter"><i data-pct="61"></i></div></div>
+      </div>
+      <p class="band-note enter">拖动滑块比较两边。两张图是同一视口下工具自己截的，不是设计稿。</p>
+      <p class="caption enter">这组数字来自工具在本地 fixture 上的真实运行：41 个资产可用、3 个失败被记下、1873 个 DOM 节点、0 个动态区域。</p>
+    </div>
+  </section>
+
+  <section class="block" id="how">
+    <div class="wrap">
+      <h2 class="mask"><span>它做三件事。</span></h2>
+      <div class="split">
+        <dl>
+          <div class="enter"><dt>捕获</dt><dd>打开目标页，等它稳定，把 DOM、样式、字体和图片取下来。轮播、计时器、随机数会被冻结，会动的区域单独记进 dynamic.json。</dd></div>
+          <div class="enter"><dt>收敛</dt><dd>逐视口比对像素，按差异位置改代码，重复到低于阈值。改不掉的差异画成热力图交给你，而不是藏起来。</dd></div>
+          <div class="enter"><dt>交付</dt><dd>输出能跑的 React 工程：组件、样式、本地化资产，外加一份带截图与热力图的验证报告。</dd></div>
+        </dl>
+        <figure class="enter">
+          <img src="/demo/capture-768.jpg" alt="同一页面在 768px 视口下的捕获截图" width="900" height="1200" />
+          <figcaption class="caption">第二个视口照样跑：768px 下的捕获结果。</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="verify">
+    <div class="wrap">
+      <h2 class="mask"><span>不一样的地方，它会告诉你。</span></h2>
+      <div class="verify">
+        <figure class="enter">
+          <img src="/demo/heatmap.jpg" alt="原站与还原页的像素差异热力图，红色为差异位置" width="1200" height="515" />
+          <figcaption class="caption">红色是两边不一致的像素。这张图随工程一起交付。</figcaption>
+        </figure>
+        <div class="enter">
+          <ul>
+            <li><span>结构相似度 SSIM</span><b>0.9997</b></li>
+            <li><span>像素差异</span><b>0.03%</b></li>
+            <li><span>资产可用 / 失败</span><b>41 / 3</b></li>
+            <li><span>动态区域</span><b>0</b></li>
+            <li><span>DOM 节点</span><b>1873</b></li>
+          </ul>
+          <p>我们不承诺 100% 一致。动态内容、第三方组件和跨域字体会被标出来，你会看到它在哪里没对齐，以及为什么。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="output">
+    <div class="wrap">
+      <h2 class="mask"><span>拿到的是工程，不是截图。</span></h2>
+      <div class="code">
+        <pre class="enter"><code>/** @region 0/1 (section.hero &gt; div.hero-bg, h1, button.cta) */
+export function Hero() {
+  return (
+    &lt;section className="hero"&gt;
+      &lt;div className="hero-bg" /&gt;
+      &lt;h1&gt;Clone me if you can&lt;/h1&gt;
+      &lt;button className="cta" type="button"&gt;
+        Get Started
+      &lt;/button&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+        <figcaption class="caption">上面是生成结果里的一个组件，原文件连同 region 注释一起给你。</figcaption>
+        <ul class="files enter">
+          <li>src/components 下每个组件都带 @region 注释，指回原站对应的区域</li>
+          <li>样式与 tokens 跟着工程走，public/assets 里的图片已经本地化</li>
+          <li>npm install 之后 npm run dev 就能打开，不需要再连回原站</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="try enter">
+    <h2 class="mask"><span>现在就能试。</span></h2>
+    <p>内测中：注册需要管理员开通，登录之后立刻可以提交捕获。</p>
+    <a class="action" href="/app">登录 / 注册</a>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="mark mask"><span>Kloon</span></div>
+    <div class="links">
+      <a href="/app">登录 / 注册</a>
+      <a href="#how">怎么工作</a>
+      <a href="#verify">验证</a>
+      <a href="#output">产物</a>
+    </div>
+    <p class="note">页面上的截图、热力图和代码片段都来自 Kloon 自己的运行结果。kloon.dev</p>
+  </div>
+</footer>
+
+<script>
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  // reveal on scroll: parts of every section, not one fade of the whole block
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue
+      e.target.classList.add('in')
+      io.unobserve(e.target)
+    }
+  }, { rootMargin: '0px 0px -12% 0px' })
+  document.querySelectorAll('.enter').forEach((el, i) => {
+    el.style.transitionDelay = `${Math.min(i % 4, 3) * 60}ms`
+    io.observe(el)
+  })
+
+  // masked headlines
+  const heads = [...document.querySelectorAll('.mask')]
+  heads.forEach((h, i) => setTimeout(() => h.classList.add('in'), reduce ? 0 : 90 * i + 60))
+
+  // figure bars
+  const fill = () => document.querySelectorAll('.meter i').forEach((i) => { i.style.width = `${i.dataset.pct}%` })
+  if (reduce) fill(); else setTimeout(fill, 500)
+
+  // the one interactive thing: drag (or arrow-key) the compare slider
+  const range = document.querySelector('#split')
+  const panel = document.querySelector('#compare')
+  const apply = () => { panel.style.setProperty('--split', `${range.value}%`) }
+  range.addEventListener('input', apply)
+  apply()
+
+  // control feedback: links lift a hair on hover (transform only)
+  document.querySelectorAll('a.action, a.quiet, .bar nav a').forEach((a) => {
+    a.addEventListener('pointerenter', () => { if (!reduce) a.style.transform = 'translateY(-1px)' })
+    a.addEventListener('pointerleave', () => { a.style.transform = '' })
+  })
+</script>
+</body>
+</html>

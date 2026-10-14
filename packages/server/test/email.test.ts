@@ -86,6 +86,9 @@ describe('email flows (Resend)', () => {
     expect(mail.to).toEqual(['mail-user@email.test'])
     expect(mail.subject).toContain('邮箱验证')
     expect(mail.from).toContain('Kloon')
+    // links land on the console (/app), not the public landing page
+    expect(mail.text).toContain('/app?verify=')
+    expect(mail.html).toContain('/app?verify=')
 
     // job routes are blocked until the address is verified
     const blocked = await fetch(`${server.url}/api/tasks`, { headers: { cookie } })
@@ -130,6 +133,7 @@ describe('email flows (Resend)', () => {
 
     const mail = resend.emails.find((m) => m.to[0] === 'reset-user@email.test' && m.subject.includes('密码重置'))
     expect(mail).toBeTruthy()
+    expect(mail!.text).toContain('/app?reset=')
     const token = tokenFrom(mail!.text, 'reset')!
     expect(token).toBeTruthy()
 

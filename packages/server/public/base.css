@@ -1,0 +1,189 @@
+/* Kloon shared foundation: tokens, reset, controls, motion.
+   Source of truth for the three locks (one accent, one radius, one theme).
+   Used by / (landing.html) and /app (index.html). */
+
+[hidden] { display: none !important; }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+
+body {
+    font-family: var(--font);
+    font-size: var(--step-body);
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.04em; line-height: 1.02; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+.skip { position: absolute; left: -9999px; color: var(--ink); text-decoration: none; }
+
+.skip:focus { left: var(--margin); top: 8px; z-index: 10; background: var(--accent); color: var(--accent-ink); padding: 8px 12px; }
+
+/* one control style for the whole app: inputs, selects, textareas */
+input[type=text], input[type=email], input[type=password], input[type=file], select, textarea {
+    width: 100%; min-height: 40px; padding: 0 12px; background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    font: inherit; font-size: var(--step-small);
+  }
+
+textarea { padding: 10px 12px; }
+
+input::placeholder { color: var(--muted); }
+
+input[type=checkbox] { width: 15px; min-height: 15px; height: 15px; accent-color: var(--accent); }
+
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.action {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 40px; padding: 0 18px; border-radius: var(--radius);
+    background: var(--accent); color: var(--accent-ink);
+    font-size: var(--step-small); font-weight: 600;
+    transition: transform .12s ease, filter .15s ease;
+  }
+
+.action:hover { filter: brightness(1.08); }
+
+.action:active { transform: translateY(1px); }
+
+.action.ghost { background: var(--surface-2); color: var(--ink); font-weight: 500; }
+
+.action.danger { background: var(--surface-2); color: var(--ink); font-weight: 500; }
+
+.action.danger:hover { color: var(--accent); border-color: var(--accent); }
+
+.action[disabled] { opacity: .55; cursor: default; }
+
+.action.small { min-height: 32px; padding: 0 12px; font-size: var(--step-small); }
+
+.state.done { color: var(--ink); }
+
+.state.running { color: var(--accent); }
+
+.state.queued { color: var(--muted); }
+
+.state.failed { color: var(--accent); }
+
+.state.pass { color: var(--ink); }
+
+.log.compact { max-height: 160px; }
+
+.halves { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
+
+.halves figure { margin: 0; background: var(--surface); }
+
+.halves figure + figure { background: var(--surface-2); }
+
+.halves figcaption { padding: 12px 14px 0; color: var(--muted); font-size: var(--step-small); }
+
+.halves .frame { margin: 12px 14px 14px; aspect-ratio: 16 / 10; background: var(--bg); overflow: hidden; }
+
+.halves .frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; transform: scale(1.02); transition: transform 1.2s cubic-bezier(.2,.7,.2,1); }
+
+.halves.in .frame img { transform: scale(1); }
+
+.band { margin-top: 8px; background: var(--surface-2); border-radius: var(--radius); overflow: hidden; }
+
+.band figcaption { padding: 12px 14px 0; color: var(--muted); font-size: var(--step-small); }
+
+.band .frame { margin: 12px 14px 14px; aspect-ratio: 21 / 9; background: var(--bg); overflow: hidden; }
+
+.band .frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: clamp(20px, 3vw, 40px); margin-top: 28px; }
+
+.figure b { display: block; font-size: clamp(2rem, 4.5vw, 3.25rem); font-weight: 600; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+
+.figure span { display: block; margin-top: 10px; color: var(--muted); font-size: var(--step-small); }
+
+.figure.pass .meter i { background: var(--accent); }
+
+.bar-in {
+    display: flex; align-items: center; gap: 20px; flex-wrap: nowrap;
+    padding: 0 var(--margin); min-height: 56px;
+  }
+
+.bar .links, .bar .bar-right, .bar .wordmark { flex: 0 0 auto; }
+
+.bar .who, .bar .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.bar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+.bar-right .meta { color: var(--muted); font-size: var(--step-small); }
+
+.meter { margin-top: 12px; height: 3px; background: var(--surface-2); }
+
+.meter i { display: block; height: 100%; width: 0; background: var(--muted); transition: width .8s cubic-bezier(.2,.7,.2,1); }
+
+.notice { padding: 12px 14px; border-radius: var(--radius); background: var(--surface); border-left: 3px solid var(--accent); font-size: var(--step-small); }
+
+.notice.bad { border-left-color: var(--ink); color: var(--ink); }
+
+.empty { color: var(--muted); font-size: var(--step-body); padding: 24px 0; }
+
+.stack { display: grid; gap: 16px; }
+
+.mask { display: block; overflow: hidden; }
+
+.mask > span { display: block; transform: translateY(105%); transition: transform .7s cubic-bezier(.2,.75,.2,1); }
+
+.mask.in > span { transform: none; }
+
+.enter { opacity: 0; transform: translateY(18px); transition: opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1); }
+
+.enter.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .mask > span { transform: none; transition: none; }
+    .enter { opacity: 1; transform: none; transition: none; }
+    .meter i { transition: none; }
+  }
+
+/* ---------------------------------------------------------------
+     Direction: "The product performs" (seed 1409965750), preserve mode.
+     Confirmed 2026-10-14 with the owner:
+       accent  = the existing brand green (#4ade80), the only accent on the page
+       type    = system UI stack (Latin + CJK), no external font
+       radius  = one system (6px)      · theme = one dark theme
+       routes  = "/" public landing page, "/app" the console
+     Tokens first; everything downstream references tokens only.
+     --------------------------------------------------------------- */
+  :root {
+    --bg: #0b0b0e;
+    --surface: #131316;
+    --surface-2: #1b1b1f;
+    --line: #232327;
+    --ink: #e4e4e7;
+    --muted: #a1a1aa;
+    --accent: #4ade80;
+    --accent-ink: #052e16;
+
+    --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+    --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+    --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+    --step-head: clamp(1.75rem, 1.15rem + 2.4vw, 2.75rem);
+
+    --radius: 6px;
+    --margin: clamp(16px, 2vw, 28px);
+    --ledger: 560px;
+    --gap-section: clamp(48px, 6vw, 96px);
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+/* ---------- bar: wordmark, plain links, one action (no chrome) ---------- */
+  .bar { background: var(--surface); }
+
+/* ---------- status marks: flat, no pills ---------- */
+  .state { font-size: var(--step-small); font-weight: 500; }
+
+/* ---------- motion: masked headline, entrances, feedback ---------- */
+  .mask { display: block; overflow: hidden; }

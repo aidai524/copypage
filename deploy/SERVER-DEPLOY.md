@@ -176,6 +176,18 @@ cd /srv/kloon && git pull            # 方式 B
 cd deploy && docker compose up -d --build
 ```
 
+### 路由与静态资源(2026-10-14 起)
+
+| 路径 | 内容 |
+|---|---|
+| `/` | 公开落地页(`packages/server/public/landing.html`) |
+| `/app` | 控制台(`packages/server/public/index.html`),邮件里的 `?verify=` / `?reset=` 也落在这里 |
+| `/base.css` | 两页共用的 tokens/控件/动效(**三把锁的单一来源**) |
+| `/demo/*.jpg` | 落地页与访客页展示的真实产物图 |
+
+> 改配色/圆角/字体/控件只改 `packages/server/public/base.css` 一处,两个页面同时生效。
+> 改 `.html` 或 `.css` 都属于源文件改动 —— 仍然必须 `--build`。
+
 > ⚠️ **改动了源文件(含 `packages/server/public/index.html`)必须 `--build`**。
 > `docker compose restart` 只是重启容器,镜像里烘焙的是构建时的源码 —— 改完前端后只 restart
 > 会出现"文件明明改了、页面还是旧的"。想改前端立即生效,可在 `docker-compose.override.yml` 里挂载:

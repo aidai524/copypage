@@ -76,7 +76,7 @@ function layout(opts: { title: string; intro: string; cta?: { label: string; url
 }
 
 export function verificationEmail(config: ServerConfig, to: string, token: string): EmailMessage {
-  const url = `${config.appUrl}/?verify=${encodeURIComponent(token)}`
+  const url = `${config.appUrl}/app?verify=${encodeURIComponent(token)}`
   const rendered = layout({
     title: '验证你的邮箱',
     intro: '点击下面的按钮完成邮箱验证,之后即可提交捕获/验证/生成任务。链接 24 小时内有效。',
@@ -86,7 +86,7 @@ export function verificationEmail(config: ServerConfig, to: string, token: strin
 }
 
 export function resetEmail(config: ServerConfig, to: string, token: string): EmailMessage {
-  const url = `${config.appUrl}/?reset=${encodeURIComponent(token)}`
+  const url = `${config.appUrl}/app?reset=${encodeURIComponent(token)}`
   const rendered = layout({
     title: '重置密码',
     intro: '点击下面的按钮设置新密码。链接 1 小时内有效;如果不是你本人操作,请忽略本邮件。',

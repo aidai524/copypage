@@ -3,238 +3,120 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Kloon — 把任意网页还原成代码</title>
+<title>Kloon · 把任意网页还原成代码</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2318191b'/%3E%3Crect x='7' y='7' width='18' height='18' fill='%23ff4a1f'/%3E%3C/svg%3E" />
-<link rel="preconnect" href="https://api.fontshare.com" />
-<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
-<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/base.css" />
 <style>
-  /* ---------------------------------------------------------------
-     Direction: "The product performs" (seed 1409965750)
-     Type: Switzer · Colour: graphite + safety orange
-     Tokens first; everything downstream references tokens only.
-     --------------------------------------------------------------- */
-  :root {
-    --bg: #18191b;
-    --surface: #222427;
-    --surface-2: #2b2d31;
-    --ink: #eff0f1;
-    --muted: #9c9ea3;
-    --accent: #ff4a1f;
-    --accent-ink: #18191b;
-    --field: #eff0f1;
-    --field-ink: #18191b;
-
-    --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
-    --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
-    --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
-    --step-head: clamp(1.75rem, 1.15rem + 2.4vw, 2.75rem);
-
-    --radius: 4px;
-    --margin: clamp(16px, 2vw, 28px);
-    --ledger: 560px;
-    --gap-section: clamp(48px, 6vw, 96px);
-    --font: Switzer, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  }
-
-  *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--ink); }
-  body {
-    font-family: var(--font);
-    font-size: var(--step-body);
-    line-height: 1.5;
-    letter-spacing: -0.005em;
-    -webkit-font-smoothing: antialiased;
-  }
-  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.04em; line-height: 1.02; }
-  p { margin: 0; }
-  a { color: inherit; }
-  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-  img { display: block; max-width: 100%; }
-
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  ::selection { background: var(--accent); color: var(--accent-ink); }
-
-  .skip { position: absolute; left: -9999px; }
-  .skip:focus { left: var(--margin); top: 8px; z-index: 10; background: var(--accent); color: var(--accent-ink); padding: 8px 12px; }
-
-  /* ---------- bar: wordmark, plain links, one action (no chrome) ---------- */
-  .bar { background: var(--surface); }
-  .bar-in {
-    display: flex; align-items: center; gap: 20px; flex-wrap: nowrap;
-    padding: 0 var(--margin); min-height: 56px;
-  }
-  .bar .links, .bar .bar-right, .bar .wordmark { flex: 0 0 auto; }
-  .bar .who, .bar .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  @media (max-width: 720px) {
+p { margin: 0; }
+a { color: inherit; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+img { display: block; max-width: 100%; }
+@media (max-width: 720px) {
     .bar-in { gap: 10px; min-height: 52px; }
     .bar-right .meta { display: none; }
     .bar .who { max-width: 88px; }
     .links button, .quiet { padding: 8px 9px; }
   }
-  .wordmark { font-size: var(--step-lead); font-weight: 600; letter-spacing: -0.04em; text-decoration: none; }
-  .links { display: flex; gap: 4px; }
-  .links button, .quiet {
+.wordmark { font-size: var(--step-lead); font-weight: 600; letter-spacing: -0.04em; text-decoration: none; }
+.links { display: flex; gap: 4px; }
+.links button, .quiet {
     padding: 8px 12px; border-radius: var(--radius); color: var(--muted);
     font-size: var(--step-small); font-weight: 500;
     transition: color .15s, background-color .15s;
   }
-  .links button:hover, .quiet:hover { color: var(--ink); background: var(--surface-2); }
-  .links button.active { color: var(--ink); background: var(--surface-2); }
-  .bar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-  .bar-right .meta { color: var(--muted); font-size: var(--step-small); }
-  .who { font-size: var(--step-small); color: var(--muted); }
-
-  .banner {
+.links button:hover, .quiet:hover { color: var(--ink); background: var(--surface-2); }
+.links button.active { color: var(--ink); background: var(--surface-2); }
+.who { font-size: var(--step-small); color: var(--muted); }
+.banner {
     display: flex; align-items: center; gap: 12px;
     margin: var(--margin) var(--margin) 0; padding: 14px 16px;
     background: var(--surface); border-left: 3px solid var(--accent);
     font-size: var(--step-small);
   }
-  .banner[hidden] { display: none; }
-
-  main { padding: 0 var(--margin); }
-  .grid { display: grid; grid-template-columns: minmax(0, var(--ledger)) minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); align-items: start; }
-  /* only very wide screens can afford a reserved lane for the hover preview;
+.banner[hidden] { display: none; }
+main { padding: 0 var(--margin); }
+.grid { display: grid; grid-template-columns: minmax(0, var(--ledger)) minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); align-items: start; }
+/* only very wide screens can afford a reserved lane for the hover preview;
      below that the ledger and the detail share the width (and the preview stays off) */
   @media (min-width: 1600px) { .grid { grid-template-columns: minmax(0, var(--ledger)) 380px minmax(0, 1fr); } }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-
-  /* ---------- first screen: the product performing ---------- */
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+/* ---------- first screen: the product performing ---------- */
   .intro { padding: clamp(40px, 7vw, 96px) 0 clamp(28px, 4vw, 48px); max-width: 34ch; }
-  .intro h1 { font-size: var(--step-head); }
-  .intro p { margin-top: 18px; color: var(--ink); font-size: var(--step-body); max-width: 42ch; }
-
-  /* the working control, at real interface size */
+.intro h1 { font-size: var(--step-head); }
+.intro p { margin-top: 18px; color: var(--ink); font-size: var(--step-body); max-width: 42ch; }
+/* the working control, at real interface size */
   [data-ui] { border-radius: var(--radius); }
-  .capture { background: var(--surface); padding: 18px; display: grid; gap: 14px; }
-  .capture-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .capture label { display: grid; gap: 6px; font-size: var(--step-small); color: var(--muted); }
-  .capture input[type=text], .capture input[type=email], .capture input[type=password], .capture select,
-  .admin input[type=text], .admin select {
-    height: 40px; padding: 0 12px; background: var(--surface-2); color: var(--ink);
-    border: 1px solid #3a3d42; border-radius: var(--radius); font: inherit; font-size: var(--step-small);
-  }
-  .capture input:focus, .capture select:focus, .admin input:focus, .admin select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
-  .capture .grow { flex: 1 1 240px; min-width: 0; }
-  .capture .grow input { width: 100%; }
-  .capture .opts { display: flex; gap: 18px; flex-wrap: wrap; font-size: var(--step-small); color: var(--muted); }
-  .capture .opts label { display: flex; align-items: center; gap: 8px; }
-
-  .action {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-height: 40px; padding: 0 18px; border-radius: var(--radius);
-    background: var(--accent); color: var(--accent-ink);
-    font-size: var(--step-small); font-weight: 600;
-    transition: transform .12s ease, filter .15s ease;
-  }
-  .action:hover { filter: brightness(1.08); }
-  .action:active { transform: translateY(1px); }
-  .action.ghost { background: var(--surface-2); color: var(--ink); font-weight: 500; }
-  /* taste-skill-ignore: destructive control needs an outline to read as one, and the accent on the ground is what clears 4.5:1 */
-  .action.danger { background: none; color: var(--accent); border: 1px solid #3a3d42; font-weight: 500; }
-  .action[disabled] { opacity: .55; cursor: default; }
-  .action.small { min-height: 32px; padding: 0 12px; font-size: var(--step-small); }
-
-  /* ---------- ledger: two-ended rows, hover preview to the right ---------- */
+.capture { background: var(--surface); padding: 18px; display: grid; gap: 14px; }
+.capture-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.capture label { display: grid; gap: 6px; font-size: var(--step-small); color: var(--muted); }
+.capture .grow { flex: 1 1 240px; min-width: 0; }
+.capture .grow input { width: 100%; }
+.capture .opts { display: flex; gap: 18px; flex-wrap: wrap; font-size: var(--step-small); color: var(--muted); }
+.capture .opts label { display: flex; align-items: center; gap: 8px; }
+/* ---------- ledger: two-ended rows, hover preview to the right ---------- */
   .section-head { display: flex; align-items: baseline; gap: 16px; margin: var(--gap-section) 0 24px; }
-  .section-head h2 { font-size: var(--step-lead); }
-  .section-head .count { color: var(--muted); font-size: var(--step-small); }
-
-  .ledger { position: relative; }
-
-  .ledger ul { list-style: none; margin: 0; padding: 0; }
-  .ledger li { border-radius: var(--radius); }
-  .row {
+.section-head h2 { font-size: var(--step-lead); }
+.section-head .count { color: var(--muted); font-size: var(--step-small); }
+.ledger { position: relative; }
+.ledger ul { list-style: none; margin: 0; padding: 0; }
+.ledger li { border-radius: var(--radius); }
+.row {
     display: grid; grid-template-columns: 1fr auto; gap: 4px 16px;
     width: 100%; text-align: left; padding: 11px 12px; border-radius: var(--radius);
     transition: background-color .15s ease, opacity .15s ease;
   }
-  .row .name { font-size: var(--step-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row .kind { grid-column: 1; color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
-  .row .metric { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-align: right; font-variant-numeric: tabular-nums; }
-  .row .metric b { display: block; font-size: var(--step-body); font-weight: 600; }
-  .row .metric span { color: var(--muted); font-size: var(--step-small); }
-  .row.selected { background: var(--surface-2); }
-  .ledger ul:hover .row:not(:hover) { opacity: .5; }
-  .row:hover { background: var(--surface); }
-
-  .preview {
+.row .name { font-size: var(--step-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .kind { grid-column: 1; color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+.row .metric { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-align: right; font-variant-numeric: tabular-nums; }
+.row .metric b { display: block; font-size: var(--step-body); font-weight: 600; }
+.row .metric span { color: var(--muted); font-size: var(--step-small); }
+.row.selected { background: var(--surface-2); }
+.ledger ul:hover .row:not(:hover) { opacity: .5; }
+.row:hover { background: var(--surface); }
+.preview {
     display: none;
     position: absolute; left: calc(100% + 32px); width: min(340px, 34vw);
     aspect-ratio: 16 / 10; overflow: hidden; background: var(--surface);
     opacity: 0; pointer-events: none; transition: opacity .15s ease;
   }
-  .preview img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
-  .preview.on { opacity: 1; }
-  @media (min-width: 1600px) { .preview { display: block; } }
-  @media (max-width: 900px) {
+.preview img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.preview.on { opacity: 1; }
+@media (min-width: 1600px) { .preview { display: block; } }
+@media (max-width: 900px) {
     .row .thumb { grid-column: 1 / -1; aspect-ratio: 16 / 10; overflow: hidden; margin-bottom: 8px; }
   }
-  .thumb { display: none; }
-  @media (max-width: 900px) { .thumb { display: block; background: var(--surface); } .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; } }
-
-  /* ---------- status marks: flat, no pills ---------- */
-  .state { font-size: var(--step-small); font-weight: 500; }
-  .state.done { color: var(--ink); }
-  .state.running { color: var(--accent); }
-  .state.queued { color: var(--muted); }
-  .state.failed { color: var(--accent); }
-  .state.pass { color: var(--ink); }
-
-  /* ---------- detail: input half / output half, then the figure bars ---------- */
+.thumb { display: none; }
+@media (max-width: 900px) { .thumb { display: block; background: var(--surface); } .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; } }
+/* ---------- detail: input half / output half, then the figure bars ---------- */
   #detail { padding-top: clamp(20px, 3.5vw, 44px); }
-  .detail-block { margin-bottom: var(--gap-section); }
-  .detail-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
-  .detail-head h3 { font-size: var(--step-lead); word-break: break-all; }
-  .detail-head .id { color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
-
-  .halves { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
-  .halves figure { margin: 0; background: var(--surface); }
-  .halves figure + figure { background: var(--surface-2); }
-  .halves figcaption { padding: 12px 14px 0; color: var(--muted); font-size: var(--step-small); }
-  .halves .frame { margin: 12px 14px 14px; aspect-ratio: 16 / 10; background: var(--bg); overflow: hidden; }
-  .halves .frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; transform: scale(1.02); transition: transform 1.2s cubic-bezier(.2,.7,.2,1); }
-  .halves.in .frame img { transform: scale(1); }
-  .band { margin-top: 8px; background: var(--surface-2); border-radius: var(--radius); overflow: hidden; }
-  .band figcaption { padding: 12px 14px 0; color: var(--muted); font-size: var(--step-small); }
-  .band .frame { margin: 12px 14px 14px; aspect-ratio: 21 / 9; background: var(--bg); overflow: hidden; }
-  .band .frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
-  @media (max-width: 700px) { .halves { grid-template-columns: 1fr; } }
-
-  .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: clamp(20px, 3vw, 40px); margin-top: 28px; }
-  .figure b { display: block; font-size: clamp(2rem, 4.5vw, 3.25rem); font-weight: 600; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
-  .figure span { display: block; margin-top: 10px; color: var(--muted); font-size: var(--step-small); }
-  .bar { margin-top: 12px; height: 3px; background: var(--surface-2); }
-  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .8s cubic-bezier(.2,.7,.2,1); }
-  .figure.pass .bar i { background: var(--ink); }
-
-  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; background: var(--surface); border-radius: var(--radius); overflow: hidden; margin-top: 24px; }
-  .facts div { background: var(--surface); padding: 14px 16px; }
-  .facts div:nth-child(even) { background: var(--surface-2); }
-  .facts dt { color: var(--muted); font-size: var(--step-small); }
-  .facts dd { margin: 6px 0 0; font-size: var(--step-body); font-variant-numeric: tabular-nums; }
-
-  /* ---------- runs: banded two-ended rows ---------- */
+.detail-block { margin-bottom: var(--gap-section); }
+.detail-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+.detail-head h3 { font-size: var(--step-lead); word-break: break-all; }
+.detail-head .id { color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) { .halves { grid-template-columns: 1fr; } }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; background: var(--surface); border-radius: var(--radius); overflow: hidden; margin-top: 24px; }
+.facts div { background: var(--surface); padding: 14px 16px; }
+.facts div:nth-child(even) { background: var(--surface-2); }
+.facts dt { color: var(--muted); font-size: var(--step-small); }
+.facts dd { margin: 6px 0 0; font-size: var(--step-body); font-variant-numeric: tabular-nums; }
+/* ---------- runs: banded two-ended rows ---------- */
   .run { background: var(--surface); border-radius: var(--radius); padding: 16px; margin-bottom: 8px; }
-  .run:nth-child(even) { background: var(--surface-2); }
-  .run-head { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: baseline; }
-  .run-head .title { font-size: var(--step-body); font-weight: 500; }
-  .run-head .when { grid-column: 1; color: var(--muted); font-size: var(--step-small); }
-  .run-head .verdict { grid-column: 2; grid-row: 1 / span 2; text-align: right; font-size: var(--step-small); }
-  .run-body { margin-top: 14px; display: grid; gap: 10px; }
-  .run-links { display: flex; flex-wrap: wrap; gap: 8px; }
-  .run-links a { padding: 6px 10px; background: var(--surface-2); border-radius: var(--radius); font-size: var(--step-small); text-decoration: none; color: var(--muted); transition: color .15s; }
-  .run .run:nth-child(odd) .run-links a { background: var(--surface); }
-  .run-links a:hover { color: var(--ink); }
-
-  /* a run's diff table is a real table: it keeps its own lines */
+.run:nth-child(even) { background: var(--surface-2); }
+.run-head { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: baseline; }
+.run-head .title { font-size: var(--step-body); font-weight: 500; }
+.run-head .when { grid-column: 1; color: var(--muted); font-size: var(--step-small); }
+.run-head .verdict { grid-column: 2; grid-row: 1 / span 2; text-align: right; font-size: var(--step-small); }
+.run-body { margin-top: 14px; display: grid; gap: 10px; }
+.run-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.run-links a { padding: 6px 10px; background: var(--surface-2); border-radius: var(--radius); font-size: var(--step-small); text-decoration: none; color: var(--muted); transition: color .15s; }
+.run .run:nth-child(odd) .run-links a { background: var(--surface); }
+.run-links a:hover { color: var(--ink); }
+/* a run's diff table is a real table: it keeps its own lines */
   .entries { width: 100%; border-collapse: collapse; font-size: var(--step-small); }
-  .entries th, .entries td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #34373c; vertical-align: top; }
-  .entries th { color: var(--muted); font-weight: 500; }
-  .entries td.sev { color: var(--accent); font-variant-numeric: tabular-nums; }
-
-  /* progress log is literal program output */
+.entries th, .entries td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.entries th { color: var(--muted); font-weight: 500; }
+.entries td.sev { color: var(--accent); font-variant-numeric: tabular-nums; }
+/* progress log is literal program output */
   /* taste-skill-ignore: build/capture logs are real code output, monospace is correct here */
   .log {
     margin: 0; padding: 14px; background: var(--bg); border-radius: var(--radius);
@@ -242,36 +124,28 @@
     font-size: var(--step-small); line-height: 1.6; color: var(--muted);
     max-height: 240px; overflow: auto; white-space: pre-wrap;
   }
-  .log.compact { max-height: 160px; }
-
-  /* ---------- admin: real tables ---------- */
+/* ---------- admin: real tables ---------- */
   .admin table { width: 100%; border-collapse: collapse; font-size: var(--step-small); }
-  .admin th, .admin td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #34373c; vertical-align: top; }
-  .admin th { color: var(--muted); font-weight: 500; }
-  .admin tr:nth-child(even) td { background: var(--surface); }
-  .admin .sub { color: var(--muted); font-variant-numeric: tabular-nums; }
-  .admin-forms { display: grid; gap: 10px; margin: 16px 0 28px; }
-  .admin-forms .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-
-  .empty { color: var(--muted); font-size: var(--step-body); padding: 24px 0; }
-  .stack { display: grid; gap: 16px; }
-
-  /* ---------- auth ---------- */
-  .auth { max-width: 420px; margin: clamp(32px, 8vw, 96px) 0; display: grid; gap: 28px; }
-  .auth form { display: grid; gap: 12px; }
-  .auth .swap { color: var(--muted); font-size: var(--step-small); text-decoration: underline; text-underline-offset: 3px; }
-
-  /* ---------- motion: masked headline, entrances, feedback ---------- */
-  .mask { display: block; overflow: hidden; }
-  .mask > span { display: block; transform: translateY(105%); transition: transform .7s cubic-bezier(.2,.75,.2,1); }
-  .ready .mask > span { transform: translateY(0); }
-  .enter { opacity: 0; transform: translateY(18px); transition: opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1); }
-  .enter.in { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) {
-    .mask > span { transform: none; transition: none; }
-    .enter { opacity: 1; transform: none; transition: none; }
-    .bar i { transition: none; }
-  }
+.admin th, .admin td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.admin th { color: var(--muted); font-weight: 500; }
+.admin tr:nth-child(even) td { background: var(--surface); }
+.admin .sub { color: var(--muted); font-variant-numeric: tabular-nums; }
+.admin-forms { display: grid; gap: 10px; margin: 16px 0 28px; }
+.admin-forms .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+/* ---------- auth (visitor's first screen) ---------- */
+  .auth h1 { font-size: clamp(2.5rem, 4.8vw, 4.25rem); }
+  .frame.auto { aspect-ratio: auto; }
+  .frame.auto img { height: auto; }
+  .auth { max-width: 420px; margin: clamp(28px, 7vw, 80px) 0; display: grid; gap: 26px; }
+.auth form { display: grid; gap: 12px; }
+.auth .swap { justify-self: start; color: var(--muted); font-size: var(--step-small); text-decoration: underline; text-underline-offset: 3px; }
+.auth .swap:hover { color: var(--ink); }
+.auth details { background: var(--surface); border-radius: var(--radius); padding: 12px 14px; }
+.auth summary { cursor: pointer; color: var(--muted); font-size: var(--step-small); }
+.auth summary:hover { color: var(--ink); }
+.auth details form { margin-top: 12px; }
+.proof { display: grid; gap: 22px; }
+.ready .mask > span { transform: translateY(0); }
 </style>
 </head>
 <body>
@@ -373,7 +247,7 @@
         },
       }],
       generations: [],
-      result: { snapshotDir: '', title: 'Fixture — 定价页', viewports: [1440, 768, 375], screenshots: { '1440': 'demo/capture.jpg' }, assetsOk: 41, assetsFailed: 3, dynamicRegions: 0, dismissed: 1, domNodes: 1873, durationMs: 6100 },
+      result: { snapshotDir: '', title: 'Fixture · 定价页', viewports: [1440, 768, 375], screenshots: { '1440': 'demo/capture.jpg' }, assetsOk: 41, assetsFailed: 3, dynamicRegions: 0, dismissed: 1, domNodes: 1873, durationMs: 6100 },
       sizeBytes: 18432000,
     },
     {
@@ -413,7 +287,7 @@
     nodes.forEach((n) => io.observe(n))
   }
   function fillBars(root = document) {
-    root.querySelectorAll('.bar i[data-pct]').forEach((el, i) => {
+    root.querySelectorAll('.meter i[data-pct]').forEach((el, i) => {
       const pct = el.getAttribute('data-pct')
       setTimeout(() => { el.style.width = pct + '%' }, reduce ? 0 : 120 + i * 90)
     })
@@ -424,46 +298,140 @@
     $('#sidebar').innerHTML = `
       <div class="auth">
         <div>
-          <h1 class="mask"><span>把网页变成代码</span></h1>
-          <p style="margin-top:16px;color:var(--muted)">捕获一个页面，读它的结构与样式，收敛到像素级一致，然后拿走 React + Tailwind 工程。</p>
+          <h1 class="mask"><span>把网页读成代码。</span></h1>
+          <p class="enter" style="margin-top:16px">Kloon 捕获一个可访问的页面，读出它的结构与样式，收敛到像素级一致，产出可运行的 React + Tailwind 工程。</p>
         </div>
-        <form id="login-form">
-          <label>邮箱<input type="email" id="login-email" required /></label>
-          <label>密码<input type="password" id="login-password" required minlength="8" /></label>
+
+        <form id="login-form" class="enter">
+          <label for="login-email">邮箱</label>
+          <input type="email" id="login-email" autocomplete="username" required />
+          <label for="login-password">密码</label>
+          <input type="password" id="login-password" autocomplete="current-password" required minlength="8" />
           <button class="action" type="submit">登录</button>
           <button class="swap" type="button" id="show-register">没有账号？注册</button>
         </form>
+
         <form id="register-form" hidden>
-          <label>邮箱<input type="email" id="reg-email" required /></label>
-          <label>密码（至少 8 位）<input type="password" id="reg-password" required minlength="8" /></label>
+          <label for="reg-email">邮箱</label>
+          <input type="email" id="reg-email" autocomplete="username" required />
+          <label for="reg-password">密码（至少 8 位）</label>
+          <input type="password" id="reg-password" autocomplete="new-password" required minlength="8" />
           <button class="action" type="submit">注册</button>
           <button class="swap" type="button" id="show-login">已有账号？登录</button>
         </form>
-        <form id="token-form">
-          <label>访问令牌（私有部署）<input type="password" id="token" placeholder="COPYPAGE_TOKEN" /></label>
-          <button class="action ghost" type="button" id="token-save">使用令牌</button>
+
+        <form id="reset-form" hidden>
+          <label for="reset-password">设置新密码（至少 8 位）</label>
+          <input type="password" id="reset-password" autocomplete="new-password" required minlength="8" />
+          <button class="action" type="submit">保存并登录</button>
+          <button class="swap" type="button" id="reset-cancel">返回登录</button>
         </form>
+
+        <details id="token-details" class="enter">
+          <summary>私有部署：使用访问令牌</summary>
+          <form id="token-form">
+            <label for="token">访问令牌</label>
+            <input type="password" id="token" placeholder="COPYPAGE_TOKEN" />
+            <button class="action ghost" type="button" id="token-save">使用令牌</button>
+          </form>
+        </details>
+
+        <div id="auth-notice"></div>
       </div>`
-    $('#detail').innerHTML = '<p class="empty">登录后即可提交捕获、验证与自动生成任务。</p>'
+
+    $('#detail').innerHTML = `
+      <div class="proof">
+        <p class="enter">不用登录就能看的东西：这是工具链自己的输出。左边是原站截图，右边是同一视口下还原页的截图，下面是两边的像素差异热力图。</p>
+        <div class="halves enter">
+          <figure class="enter">
+            <figcaption>输入 · 原站截图</figcaption>
+            <div class="frame"><img src="/demo/capture.jpg" alt="工具捕获的原站截图" width="1200" height="750" /></div>
+          </figure>
+          <figure class="enter">
+            <figcaption>输出 · 还原页截图</figcaption>
+            <div class="frame"><img src="/demo/repro.jpg" alt="还原页在相同视口下的截图" width="1200" height="750" /></div>
+          </figure>
+        </div>
+        <figure class="band enter" style="margin-top:0">
+          <figcaption>差异热力图 · 红色像素为差异位置</figcaption>
+          <div class="frame"><img src="/demo/heatmap.jpg" alt="原站与还原页的像素差异热力图" width="1200" height="515" /></div>
+        </figure>
+        <figure class="band enter">
+          <figcaption>第二个视口 · 768px 下的捕获</figcaption>
+          <div class="frame auto"><img src="/demo/capture-768.jpg" alt="同一页面在 768px 视口下的捕获截图" width="900" height="1200" /></div>
+        </figure>
+        <div class="figures">
+          <div class="figure pass enter"><b>0.9997</b><span>SSIM 结构相似度</span><div class="meter"><i data-pct="100"></i></div></div>
+          <div class="figure pass enter"><b>0.03%</b><span>像素差异</span><div class="meter"><i data-pct="12"></i></div></div>
+          <div class="figure enter"><b>6.1s</b><span>一轮捕获耗时</span><div class="meter"><i data-pct="61"></i></div></div>
+        </div>
+      </div>`
+
     $('#whoami').textContent = ''
     $('#logout').hidden = true
     $('#tab-admin').hidden = true
 
+    const notice = (msg, bad = false) => {
+      $('#auth-notice').innerHTML = msg ? `<p class="notice${bad ? ' bad' : ''}">${esc(msg)}</p>` : ''
+    }
+    const show = (which) => {
+      $('#login-form').hidden = which !== 'login'
+      $('#register-form').hidden = which !== 'register'
+      $('#reset-form').hidden = which !== 'reset'
+    }
+
     const post = async (path, body, btn) => {
-      btn.disabled = true
+      if (btn) btn.disabled = true
       try {
         const res = await api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.error || res.statusText)
         await boot()
-      } catch (err) { banner(err.message) } finally { btn.disabled = false }
+      } catch (err) { notice(err.message, true) } finally { if (btn) btn.disabled = false }
     }
-    $('#show-register').onclick = () => { $('#login-form').hidden = true; $('#register-form').hidden = false }
-    $('#show-login').onclick = () => { $('#login-form').hidden = false; $('#register-form').hidden = true }
+
+    $('#show-register').onclick = () => { notice(''); show('register') }
+    $('#show-login').onclick = () => { notice(''); show('login') }
+    $('#reset-cancel').onclick = () => { notice(''); history.replaceState(null, '', '/app'); show('login') }
     $('#login-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/login', { email: $('#login-email').value, password: $('#login-password').value }, e.target.querySelector('button[type=submit]')) }
     $('#register-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/register', { email: $('#reg-email').value, password: $('#reg-password').value }, e.target.querySelector('button[type=submit]')) }
     $('#token-save').onclick = () => { tokenStore.set($('#token').value.trim()); location.reload() }
     $('#token').value = tokenStore.get()
+
+    // links that arrive from email: ?verify=<token> and ?reset=<token>
+    const params = new URLSearchParams(location.search)
+    const verifyToken = params.get('verify')
+    const resetToken = params.get('reset')
+    if (verifyToken) {
+      show('login')
+      void api('/api/auth/verify-email', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: verifyToken }) })
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({}))
+          notice(res.ok ? '邮箱已验证，现在可以登录。' : data.error || '验证链接无效或已过期。', !res.ok)
+          history.replaceState(null, '', '/app')
+        })
+    } else if (resetToken) {
+      show('reset')
+      $('#reset-form').onsubmit = async (e) => {
+        e.preventDefault()
+        const btn = e.target.querySelector('button[type=submit]')
+        btn.disabled = true
+        try {
+          const res = await api('/api/auth/reset-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: resetToken, password: $('#reset-password').value }) })
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(data.error || res.statusText)
+          history.replaceState(null, '', '/app')
+          await boot()
+        } catch (err) { notice(err.message, true) } finally { btn.disabled = false }
+      }
+      notice('设置一个新密码即可继续。')
+    } else {
+      show('login')
+    }
+
+    observeEntrances($('#sidebar'))
+    observeEntrances($('#detail'))
+    fillBars($('#detail'))
     revealMasked()
   }
 
@@ -589,9 +557,9 @@
     if (!metrics) return ''
     const pct = (v) => Math.max(2, Math.min(100, Math.round(v * 100)))
     return `<div class="figures">
-      <div class="figure ${metrics.ssim >= 0.98 ? 'pass' : ''}"><b>${metrics.ssim}</b><span>SSIM 结构相似度</span><div class="bar"><i data-pct="${pct(metrics.ssim)}"></i></div></div>
-      <div class="figure ${metrics.pixelDiffPct <= 2 ? 'pass' : ''}"><b>${metrics.pixelDiffPct}%</b><span>像素差异</span><div class="bar"><i data-pct="${Math.min(100, metrics.pixelDiffPct * 4)}"></i></div></div>
-      ${metrics.dynamicAreaPct !== undefined ? `<div class="figure"><b>${metrics.dynamicAreaPct}%</b><span>动态区域（不参与比对）</span><div class="bar"><i data-pct="${Math.min(100, metrics.dynamicAreaPct * 2)}"></i></div></div>` : ''}
+      <div class="figure ${metrics.ssim >= 0.98 ? 'pass' : ''}"><b>${metrics.ssim}</b><span>SSIM 结构相似度</span><div class="meter"><i data-pct="${pct(metrics.ssim)}"></i></div></div>
+      <div class="figure ${metrics.pixelDiffPct <= 2 ? 'pass' : ''}"><b>${metrics.pixelDiffPct}%</b><span>像素差异</span><div class="meter"><i data-pct="${Math.min(100, metrics.pixelDiffPct * 4)}"></i></div></div>
+      ${metrics.dynamicAreaPct !== undefined ? `<div class="figure"><b>${metrics.dynamicAreaPct}%</b><span>动态区域（不参与比对）</span><div class="meter"><i data-pct="${Math.min(100, metrics.dynamicAreaPct * 2)}"></i></div></div>` : ''}
     </div>`
   }
 
@@ -703,7 +671,7 @@
       r?.title ? ['页面标题', esc(r.title)] : null,
       ['状态', `<span class="state ${t.status}">${STATUS[t.status]}</span>`],
       ['视口', (r?.viewports ?? t.options?.viewports ?? []).join(' / ') || '默认'],
-      r ? ['DOM 节点', r.domNodes ?? '—'] : null,
+      r ? ['DOM 节点', r.domNodes ?? '-'] : null,
       r ? ['资产', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`] : null,
       r ? ['动态区域', `${r.dynamicRegions} 处`] : null,
       r ? ['自动关闭弹窗', r.dismissed] : null,
@@ -904,7 +872,7 @@
     renderTasks(); renderDetail()
     setTimeout(() => {
       next.status = 'done'
-      next.result = { ...DEMO_TASKS[0].result, screenshots: { '1440': 'demo/capture.jpg' }, title: 'Fixture — 新捕获' }
+      next.result = { ...DEMO_TASKS[0].result, screenshots: { '1440': 'demo/capture.jpg' }, title: 'Fixture · 新捕获' }
       next.verifications = DEMO_TASKS[0].verifications
       upsert(next); renderTasks(); renderDetail()
     }, 2600)

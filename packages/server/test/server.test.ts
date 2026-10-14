@@ -58,6 +58,27 @@ describe('capture service', () => {
     await rm(dataDir, { recursive: true, force: true })
   })
 
+  it('serves the landing page at / and the console at /app', async () => {
+    const landing = await fetch(`${server.url}/`)
+    expect(landing.status).toBe(200)
+    const landingHtml = await landing.text()
+    expect(landingHtml).toContain('把网页读成代码')
+    // the visitor screen carries the real artifacts, not placeholder art
+    expect(landingHtml).toContain('/demo/capture.jpg')
+    expect(landingHtml).toContain('/demo/heatmap.jpg')
+    expect(landingHtml).not.toContain('id="sidebar"')
+
+    const console_ = await fetch(`${server.url}/app`)
+    expect(console_.status).toBe(200)
+    const consoleHtml = await console_.text()
+    expect(consoleHtml).toContain('id="sidebar"')
+    expect(consoleHtml).toContain('/base.css')
+
+    const shared = await fetch(`${server.url}/base.css`)
+    expect(shared.status).toBe(200)
+    expect(await shared.text()).toContain('--accent: #4ade80')
+  })
+
   it('rejects invalid task input', async () => {
     const res = await fetch(`${server.url}/api/tasks`, {
       method: 'POST',

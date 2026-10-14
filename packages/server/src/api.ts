@@ -310,9 +310,11 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     const url = new URL(req.url ?? '/', 'http://localhost')
     const pathname = url.pathname
 
-    // static UI assets: index.html at /, everything else under the public dir
+    // static UI assets: / is the public landing page, /app the console,
+    // everything else under the public dir
     if (!pathname.startsWith('/api/') && req.method === 'GET' && pathname !== '/metrics') {
-      const rel = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1))
+      const rel =
+        pathname === '/' ? 'landing.html' : pathname === '/app' ? 'index.html' : decodeURIComponent(pathname.slice(1))
       await serveFile(res, publicDir, rel)
       return
     }
