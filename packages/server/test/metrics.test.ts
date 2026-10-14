@@ -97,10 +97,18 @@ describe('GET /metrics', () => {
       await new Promise((r) => setTimeout(r, 300))
     }
 
-    const metrics = await fetch(`${server.url}/metrics`)
-    expect(metrics.status).toBe(200)
-    expect(metrics.headers.get('content-type')).toContain('text/plain')
-    const text = await metrics.text()
+    // job outcome metrics are recorded just after the task row flips to done:
+    // poll briefly instead of racing that window
+    const metricDeadline = Date.now() + 10_000
+    let text = ''
+    while (Date.now() < metricDeadline) {
+      const res = await fetch(`${server.url}/metrics`)
+      expect(res.status).toBe(200)
+      expect(res.headers.get('content-type')).toContain('text/plain')
+      text = await res.text()
+      if (text.includes('copypage_jobs_total{kind="capture",result="done"} 1')) break
+      await new Promise((r) => setTimeout(r, 200))
+    }
     expect(text).toContain('copypage_http_requests_total{')
     expect(text).toMatch(/route="\/api\/tasks"/)
     expect(text).toContain('copypage_jobs_started_total{kind="capture"} 1')
