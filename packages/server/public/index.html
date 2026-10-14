@@ -3,188 +3,450 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Kloon — 网站一比一还原服务</title>
+<title>Kloon — 把任意网页还原成代码</title>
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" rel="stylesheet" />
 <style>
+  /* ---------------------------------------------------------------
+     Direction: "The product performs" (seed 1409965750)
+     Type: Switzer · Colour: graphite + safety orange
+     Tokens first; everything downstream references tokens only.
+     --------------------------------------------------------------- */
   :root {
-    --bg: #0b0b0e; --panel: #131316; --panel-2: #1b1b1f; --border: #232327;
-    --text: #e4e4e7; --dim: #a1a1aa; --faint: #71717a;
-    --green: #4ade80; --red: #f87171; --blue: #60a5fa; --amber: #fbbf24;
+    --bg: #18191b;
+    --surface: #222427;
+    --surface-2: #2b2d31;
+    --ink: #eff0f1;
+    --muted: #9c9ea3;
+    --accent: #ff4a1f;
+    --accent-ink: #18191b;
+    --field: #eff0f1;
+    --field-ink: #18191b;
+
+    --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+    --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+    --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+    --step-head: clamp(1.75rem, 1.15rem + 2.4vw, 2.75rem);
+
+    --radius: 4px;
+    --margin: clamp(16px, 2vw, 28px);
+    --ledger: 560px;
+    --gap-section: clamp(48px, 6vw, 96px);
+    --font: Switzer, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
-  header h1 { font-size: 15px; font-weight: 600; margin: 0; }
-  header .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--green); }
-  header .meta { margin-left: auto; color: var(--faint); font-size: 12px; }
-  header .spacer { flex: 1; }
-  header button.tab { background: transparent; color: var(--dim); border: 1px solid transparent; height: 30px; padding: 0 12px; }
-  header button.tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
-  main { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; padding: 20px; align-items: start; }
-  main.admin { grid-template-columns: minmax(0, 1fr) 360px; }
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
-  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin: 0; padding: 14px 16px 8px; }
-  form.inline { padding: 0 16px 16px; display: grid; gap: 10px; }
-  label { display: grid; gap: 6px; font-size: 12px; color: var(--dim); }
-  input[type=text], input[type=email], input[type=password], select {
-    width: 100%; height: 34px; padding: 0 10px; background: var(--panel-2); color: var(--text);
-    border: 1px solid var(--border); border-radius: 6px; font: inherit;
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: var(--font);
+    font-size: var(--step-body);
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
   }
-  input:focus, select:focus { outline: 1px solid var(--blue); border-color: transparent; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .checks { display: flex; gap: 14px; font-size: 12px; color: var(--dim); }
-  .checks label { display: flex; align-items: center; gap: 6px; }
-  button { height: 34px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--green); color: #052e16; font: inherit; font-weight: 600; cursor: pointer; }
-  button:disabled { opacity: .5; cursor: default; }
-  button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
-  button.danger { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid var(--border); font-weight: 500; }
-  button.small { height: 26px; padding: 0 9px; font-size: 12px; }
-  .tasks { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; gap: 4px; max-height: 56vh; overflow: auto; }
-  .tasks li { padding: 9px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
-  .tasks li:hover { background: var(--panel-2); }
-  .tasks li.active { background: var(--panel-2); border-color: var(--border); }
-  .tasks .line1 { display: flex; align-items: center; gap: 8px; }
-  .tasks .src { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-  .tasks .time { color: var(--faint); font-size: 11px; }
-  .chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
-  .chip.queued { background: rgba(251,191,36,.15); color: var(--amber); }
-  .chip.running { background: rgba(96,165,250,.15); color: var(--blue); }
-  .chip.done { background: rgba(74,222,128,.15); color: var(--green); }
-  .chip.failed { background: rgba(248,113,113,.15); color: var(--red); }
-  .chip.pass { background: rgba(74,222,128,.15); color: var(--green); }
-  .chip.continue { background: rgba(96,165,250,.15); color: var(--blue); }
-  .chip.escalate { background: rgba(251,191,36,.15); color: var(--amber); }
-  .chip.stagnant-stop, .chip.cap-stop { background: rgba(248,113,113,.15); color: var(--red); }
-  .detail { padding: 16px; }
-  .detail .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .detail .head h3 { margin: 0; font-size: 15px; word-break: break-all; }
-  .detail .id { color: var(--faint); font-size: 12px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 14px 0; }
-  .cell { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
-  .cell .k { font-size: 11px; color: var(--faint); }
-  .cell .v { font-size: 14px; margin-top: 2px; word-break: break-all; }
-  .log { background: #0e0e11; border: 1px solid var(--border); border-radius: 8px; font: 12px/1.6 ui-monospace, Menlo, monospace; color: var(--dim); max-height: 220px; overflow: auto; padding: 10px 12px; white-space: pre-wrap; }
-  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 12px; }
-  .shot { background: var(--panel-2); border-radius: 8px; overflow: hidden; }
-  .shot .bar { display: flex; align-items: center; padding: 8px 10px; font-size: 12px; color: var(--dim); }
-  .shot .bar a { margin-left: auto; color: var(--blue); text-decoration: none; font-size: 12px; }
-  .shot img { display: block; width: 100%; max-height: 320px; object-fit: cover; object-position: top; background: #000; }
-  .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .links a { font-size: 12px; color: var(--dim); text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; background: var(--panel-2); }
-  .links a:hover { color: var(--text); border-color: var(--faint); }
-  .error { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(248,113,113,.12); color: var(--red); font-size: 13px; white-space: pre-wrap; }
-  .hint { color: var(--faint); padding: 28px 4px; }
-  .vform { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0 14px; }
-  .vform input[type=text] { flex: 1; min-width: 220px; }
-  .vform .note { color: var(--faint); font-size: 12px; width: 100%; }
-  .vrun { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--panel-2); }
-  .vrun .vhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .vrun .vhead b { font-size: 13px; }
-  .vrun .vhead .time { color: var(--faint); font-size: 11px; }
-  .vmetrics { display: flex; gap: 18px; margin: 10px 0 6px; flex-wrap: wrap; }
-  .vmetrics .m { font-size: 12px; color: var(--faint); }
-  .vmetrics .m b { display: block; font-size: 17px; color: var(--text); }
-  .vlinks a { font-size: 12px; color: var(--blue); text-decoration: none; margin-right: 12px; }
-  .vlog { background: #0e0e11; border-radius: 6px; margin-top: 8px; padding: 8px 10px; font: 11px/1.6 ui-monospace, monospace; color: var(--dim); max-height: 120px; overflow: auto; white-space: pre-wrap; }
-  .entries { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
-  .entries th, .entries td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  .entries th { color: var(--faint); font-weight: 500; }
-  .entries .sev { color: var(--amber); }
-  .entries .exp { color: var(--green); } .entries .act { color: var(--red); }
-  .banner { margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px; background: rgba(251,191,36,.12); color: var(--amber); font-size: 13px; display: none; }
-  .authcard { max-width: 420px; margin: 60px auto; }
-  .quota { display: grid; gap: 6px; margin: 10px 0 14px; }
-  .qbar { height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
-  .qbar > i { display: block; height: 100%; background: var(--blue); }
-  .qbar.warn > i { background: var(--amber); }
-  .qbar.full > i { background: var(--red); }
-  table.admin { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.admin th, table.admin td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  table.admin th { color: var(--faint); font-weight: 500; font-size: 12px; }
-  .muted { color: var(--faint); font-size: 12px; }
+  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.04em; line-height: 1.02; }
+  p { margin: 0; }
+  a { color: inherit; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  img { display: block; max-width: 100%; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus { left: var(--margin); top: 8px; z-index: 10; background: var(--accent); color: var(--accent-ink); padding: 8px 12px; }
+
+  /* ---------- bar: wordmark, plain links, one action (no chrome) ---------- */
+  .bar { background: var(--surface); }
+  .bar-in {
+    display: flex; align-items: center; gap: 20px; flex-wrap: nowrap;
+    padding: 0 var(--margin); min-height: 56px;
+  }
+  .bar .links, .bar .bar-right, .bar .wordmark { flex: 0 0 auto; }
+  .bar .who, .bar .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 720px) {
+    .bar-in { gap: 10px; min-height: 52px; }
+    .bar-right .meta { display: none; }
+    .bar .who { max-width: 88px; }
+    .links button, .quiet { padding: 8px 9px; }
+  }
+  .wordmark { font-size: var(--step-lead); font-weight: 600; letter-spacing: -0.04em; text-decoration: none; }
+  .links { display: flex; gap: 4px; }
+  .links button, .quiet {
+    padding: 8px 12px; border-radius: var(--radius); color: var(--muted);
+    font-size: var(--step-small); font-weight: 500;
+    transition: color .15s, background-color .15s;
+  }
+  .links button:hover, .quiet:hover { color: var(--ink); background: var(--surface-2); }
+  .links button.active { color: var(--ink); background: var(--surface-2); }
+  .bar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .bar-right .meta { color: var(--muted); font-size: var(--step-small); }
+  .who { font-size: var(--step-small); color: var(--muted); }
+
+  .banner {
+    display: flex; align-items: center; gap: 12px;
+    margin: var(--margin) var(--margin) 0; padding: 14px 16px;
+    background: var(--surface); border-left: 3px solid var(--accent);
+    font-size: var(--step-small);
+  }
+  .banner[hidden] { display: none; }
+
+  main { padding: 0 var(--margin); }
+  .grid { display: grid; grid-template-columns: minmax(0, var(--ledger)) minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); align-items: start; }
+  /* only very wide screens can afford a reserved lane for the hover preview;
+     below that the ledger and the detail share the width (and the preview stays off) */
+  @media (min-width: 1600px) { .grid { grid-template-columns: minmax(0, var(--ledger)) 380px minmax(0, 1fr); } }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  /* ---------- first screen: the product performing ---------- */
+  .intro { padding: clamp(40px, 7vw, 96px) 0 clamp(28px, 4vw, 48px); max-width: 34ch; }
+  .intro h1 { font-size: var(--step-head); }
+  .intro p { margin-top: 18px; color: var(--ink); font-size: var(--step-body); max-width: 42ch; }
+
+  /* the working control, at real interface size */
+  [data-ui] { border-radius: var(--radius); }
+  .capture { background: var(--surface); padding: 18px; display: grid; gap: 14px; }
+  .capture-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .capture label { display: grid; gap: 6px; font-size: var(--step-small); color: var(--muted); }
+  .capture input[type=text], .capture input[type=email], .capture input[type=password], .capture select,
+  .admin input[type=text], .admin select {
+    height: 40px; padding: 0 12px; background: var(--surface-2); color: var(--ink);
+    border: 1px solid #3a3d42; border-radius: var(--radius); font: inherit; font-size: var(--step-small);
+  }
+  .capture input:focus, .capture select:focus, .admin input:focus, .admin select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+  .capture .grow { flex: 1 1 240px; min-width: 0; }
+  .capture .grow input { width: 100%; }
+  .capture .opts { display: flex; gap: 18px; flex-wrap: wrap; font-size: var(--step-small); color: var(--muted); }
+  .capture .opts label { display: flex; align-items: center; gap: 8px; }
+
+  .action {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 40px; padding: 0 18px; border-radius: var(--radius);
+    background: var(--accent); color: var(--accent-ink);
+    font-size: var(--step-small); font-weight: 600;
+    transition: transform .12s ease, filter .15s ease;
+  }
+  .action:hover { filter: brightness(1.08); }
+  .action:active { transform: translateY(1px); }
+  .action.ghost { background: var(--surface-2); color: var(--ink); font-weight: 500; }
+  /* taste-skill-ignore: destructive control needs an outline to read as one, and the accent on the ground is what clears 4.5:1 */
+  .action.danger { background: none; color: var(--accent); border: 1px solid #3a3d42; font-weight: 500; }
+  .action[disabled] { opacity: .55; cursor: default; }
+  .action.small { min-height: 32px; padding: 0 12px; font-size: var(--step-small); }
+
+  /* ---------- ledger: two-ended rows, hover preview to the right ---------- */
+  .section-head { display: flex; align-items: baseline; gap: 16px; margin: var(--gap-section) 0 24px; }
+  .section-head h2 { font-size: var(--step-lead); }
+  .section-head .count { color: var(--muted); font-size: var(--step-small); }
+
+  .ledger { position: relative; }
+
+  .ledger ul { list-style: none; margin: 0; padding: 0; }
+  .ledger li { border-radius: var(--radius); }
+  .row {
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 16px;
+    width: 100%; text-align: left; padding: 11px 12px; border-radius: var(--radius);
+    transition: background-color .15s ease, opacity .15s ease;
+  }
+  .row .name { font-size: var(--step-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .kind { grid-column: 1; color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+  .row .metric { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-align: right; font-variant-numeric: tabular-nums; }
+  .row .metric b { display: block; font-size: var(--step-body); font-weight: 600; }
+  .row .metric span { color: var(--muted); font-size: var(--step-small); }
+  .row.selected { background: var(--surface-2); }
+  .ledger ul:hover .row:not(:hover) { opacity: .5; }
+  .row:hover { background: var(--surface); }
+
+  .preview {
+    display: none;
+    position: absolute; left: calc(100% + 32px); width: min(340px, 34vw);
+    aspect-ratio: 16 / 10; overflow: hidden; background: var(--surface);
+    opacity: 0; pointer-events: none; transition: opacity .15s ease;
+  }
+  .preview img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .preview.on { opacity: 1; }
+  @media (min-width: 1600px) { .preview { display: block; } }
+  @media (max-width: 900px) {
+    .row .thumb { grid-column: 1 / -1; aspect-ratio: 16 / 10; overflow: hidden; margin-bottom: 8px; }
+  }
+  .thumb { display: none; }
+  @media (max-width: 900px) { .thumb { display: block; background: var(--surface); } .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; } }
+
+  /* ---------- status marks: flat, no pills ---------- */
+  .state { font-size: var(--step-small); font-weight: 500; }
+  .state.done { color: var(--ink); }
+  .state.running { color: var(--accent); }
+  .state.queued { color: var(--muted); }
+  .state.failed { color: var(--accent); }
+  .state.pass { color: var(--ink); }
+
+  /* ---------- detail: input half / output half, then the figure bars ---------- */
+  #detail { padding-top: clamp(20px, 3.5vw, 44px); }
+  .detail-block { margin-bottom: var(--gap-section); }
+  .detail-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .detail-head h3 { font-size: var(--step-lead); word-break: break-all; }
+  .detail-head .id { color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+
+  .halves { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
+  .halves figure { margin: 0; background: var(--surface); }
+  .halves figure + figure { background: var(--surface-2); }
+  .halves figcaption { padding: 12px 14px 0; color: var(--muted); font-size: var(--step-small); }
+  .halves .frame { margin: 12px 14px 14px; aspect-ratio: 16 / 10; background: var(--bg); overflow: hidden; }
+  .halves .frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; transform: scale(1.02); transition: transform 1.2s cubic-bezier(.2,.7,.2,1); }
+  .halves.in .frame img { transform: scale(1); }
+  .band { margin-top: 8px; background: var(--surface-2); border-radius: var(--radius); overflow: hidden; }
+  .band figcaption { padding: 12px 14px 0; color: var(--muted); font-size: var(--step-small); }
+  .band .frame { margin: 12px 14px 14px; aspect-ratio: 21 / 9; background: var(--bg); overflow: hidden; }
+  .band .frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  @media (max-width: 700px) { .halves { grid-template-columns: 1fr; } }
+
+  .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: clamp(20px, 3vw, 40px); margin-top: 28px; }
+  .figure b { display: block; font-size: clamp(2rem, 4.5vw, 3.25rem); font-weight: 600; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .figure span { display: block; margin-top: 10px; color: var(--muted); font-size: var(--step-small); }
+  .bar { margin-top: 12px; height: 3px; background: var(--surface-2); }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .8s cubic-bezier(.2,.7,.2,1); }
+  .figure.pass .bar i { background: var(--ink); }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; background: var(--surface); border-radius: var(--radius); overflow: hidden; margin-top: 24px; }
+  .facts div { background: var(--surface); padding: 14px 16px; }
+  .facts div:nth-child(even) { background: var(--surface-2); }
+  .facts dt { color: var(--muted); font-size: var(--step-small); }
+  .facts dd { margin: 6px 0 0; font-size: var(--step-body); font-variant-numeric: tabular-nums; }
+
+  /* ---------- runs: banded two-ended rows ---------- */
+  .run { background: var(--surface); border-radius: var(--radius); padding: 16px; margin-bottom: 8px; }
+  .run:nth-child(even) { background: var(--surface-2); }
+  .run-head { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: baseline; }
+  .run-head .title { font-size: var(--step-body); font-weight: 500; }
+  .run-head .when { grid-column: 1; color: var(--muted); font-size: var(--step-small); }
+  .run-head .verdict { grid-column: 2; grid-row: 1 / span 2; text-align: right; font-size: var(--step-small); }
+  .run-body { margin-top: 14px; display: grid; gap: 10px; }
+  .run-links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .run-links a { padding: 6px 10px; background: var(--surface-2); border-radius: var(--radius); font-size: var(--step-small); text-decoration: none; color: var(--muted); transition: color .15s; }
+  .run .run:nth-child(odd) .run-links a { background: var(--surface); }
+  .run-links a:hover { color: var(--ink); }
+
+  /* a run's diff table is a real table: it keeps its own lines */
+  .entries { width: 100%; border-collapse: collapse; font-size: var(--step-small); }
+  .entries th, .entries td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #34373c; vertical-align: top; }
+  .entries th { color: var(--muted); font-weight: 500; }
+  .entries td.sev { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+  /* progress log is literal program output */
+  /* taste-skill-ignore: build/capture logs are real code output, monospace is correct here */
+  .log {
+    margin: 0; padding: 14px; background: var(--bg); border-radius: var(--radius);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--step-small); line-height: 1.6; color: var(--muted);
+    max-height: 240px; overflow: auto; white-space: pre-wrap;
+  }
+  .log.compact { max-height: 160px; }
+
+  /* ---------- admin: real tables ---------- */
+  .admin table { width: 100%; border-collapse: collapse; font-size: var(--step-small); }
+  .admin th, .admin td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #34373c; vertical-align: top; }
+  .admin th { color: var(--muted); font-weight: 500; }
+  .admin tr:nth-child(even) td { background: var(--surface); }
+  .admin .sub { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .admin-forms { display: grid; gap: 10px; margin: 16px 0 28px; }
+  .admin-forms .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .empty { color: var(--muted); font-size: var(--step-body); padding: 24px 0; }
+  .stack { display: grid; gap: 16px; }
+
+  /* ---------- auth ---------- */
+  .auth { max-width: 420px; margin: clamp(32px, 8vw, 96px) 0; display: grid; gap: 28px; }
+  .auth form { display: grid; gap: 12px; }
+  .auth .swap { color: var(--muted); font-size: var(--step-small); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ---------- motion: masked headline, entrances, feedback ---------- */
+  .mask { display: block; overflow: hidden; }
+  .mask > span { display: block; transform: translateY(105%); transition: transform .7s cubic-bezier(.2,.75,.2,1); }
+  .ready .mask > span { transform: translateY(0); }
+  .enter { opacity: 0; transform: translateY(18px); transition: opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1); }
+  .enter.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .mask > span { transform: none; transition: none; }
+    .enter { opacity: 1; transform: none; transition: none; }
+    .bar i { transition: none; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <span class="dot"></span>
-  <h1>Kloon</h1>
-  <button class="tab" id="tab-tasks" style="margin-left:12px">任务</button>
-  <button class="tab" id="tab-admin" style="display:none">管理</button>
-  <span class="spacer"></span>
-  <span class="meta" id="health">…</span>
-  <span class="meta" id="whoami"></span>
-  <button class="ghost small" id="logout" style="display:none">退出</button>
+<a class="skip" href="#main">跳到主内容</a>
+
+<header class="bar">
+  <div class="bar-in">
+    <a class="wordmark" href="/">Kloon</a>
+    <nav class="links" aria-label="主要">
+      <button id="tab-tasks" class="active">任务</button>
+      <button id="tab-admin" hidden>管理</button>
+    </nav>
+    <div class="bar-right">
+      <span class="meta" id="health"></span>
+      <span class="who" id="whoami" title=""></span>
+      <button class="quiet" id="logout" hidden>退出</button>
+    </div>
+  </div>
 </header>
-<div class="banner" id="banner"></div>
-<main id="app">
-  <aside class="panel" id="sidebar"></aside>
-  <section class="panel" id="detail"><p class="hint">加载中…</p></section>
+
+<div class="banner" id="banner" hidden></div>
+
+<main id="main">
+  <div class="grid" id="app">
+    <div id="sidebar"></div>
+    <section id="detail"><p class="empty">正在载入…</p></section>
+  </div>
 </main>
 
 <script>
   const $ = (s) => document.querySelector(s)
-  const state = { me: null, tasks: [], selected: null, view: 'tasks', admin: { users: [], blocks: [], audit: [], stats: null } }
-  const tokenStore = {
-    get() { return localStorage.getItem('copypage-token') || '' },
-    set(v) { v ? localStorage.setItem('copypage-token', v) : localStorage.removeItem('copypage-token') },
-  }
-  const STATUS = { queued: '排队中', running: '捕获中', done: '完成', failed: '失败' }
+  const $$ = (s) => Array.from(document.querySelectorAll(s))
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('zh-CN', { hour12: false }) }
+  const fmtBytes = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n > 1024 ? (n / 1024).toFixed(0) + ' KB' : (n || 0) + ' B')
+  const fmtDuration = (ms) => (ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : (ms || 0) + 'ms')
+  const STATUS = { queued: '排队中', running: '进行中', done: '完成', failed: '失败' }
   const VSTATUS = { queued: '排队中', running: '验证中', done: '完成', failed: '失败' }
   const DECISION = { pass: '通过', continue: '继续迭代', escalate: '升级诊断', 'stagnant-stop': '停滞终止', 'cap-stop': '轮次上限' }
 
+  // dev-only demo mode: renders the console with real captured artifacts, no API
+  const DEMO = new URLSearchParams(location.search).has('demo') &&
+    ['localhost', '127.0.0.1', '::1'].includes(location.hostname)
+
+  const state = { me: null, tasks: [], selected: null, view: 'tasks' }
+  const tokenStore = {
+    get() { return DEMO ? '' : localStorage.getItem('copypage-token') || '' },
+    set(v) { DEMO ? null : (v ? localStorage.setItem('copypage-token', v) : localStorage.removeItem('copypage-token')) },
+  }
   function api(path, init = {}) {
     const headers = { ...(init.headers || {}) }
     const token = tokenStore.get()
     if (token) headers.authorization = 'Bearer ' + token
     return fetch(path, { credentials: 'same-origin', ...init, headers })
   }
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-  const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('zh-CN', { hour12: false }) }
-  const fmtBytes = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n > 1024 ? (n / 1024).toFixed(0) + ' KB' : (n || 0) + ' B')
-  const fmtDuration = (ms) => (ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms')
-  function banner(msg) { const el = $('#banner'); el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none' }
-  function renderWarnings() {
+  function banner(msg) {
     const el = $('#banner')
-    const warnings = (state.me?.warnings ?? []).filter((w) => !w.acknowledged)
-    if (warnings.length === 0) { banner(''); return }
-    const w = warnings[0]
-    el.innerHTML = `<span>⚠ ${esc(w.message)}</span>
-      <button class="ghost small" id="ack-warning" style="margin-left:12px">知道了</button>
-      ${warnings.length > 1 ? `<span class="muted" style="margin-left:8px">还有 ${warnings.length - 1} 条</span>` : ''}`
-    el.style.display = 'flex'
-    el.style.gap = '8px'
-    el.style.alignItems = 'center'
-    $('#ack-warning').onclick = async () => {
-      await api(`/api/warnings/${w.id}/ack`, { method: 'POST' })
-      await boot()
-    }
+    el.textContent = msg || ''
+    el.hidden = !msg
   }
   function upsert(task) { const i = state.tasks.findIndex((t) => t.id === task.id); if (i >= 0) state.tasks[i] = task; else state.tasks.unshift(task) }
 
-  // ---------- auth ----------
+  // ---------- demo fixtures (real output of the toolchain, see public/demo/README.txt) ----------
+  const demoVariant = (id, source, status, ago, metrics) => ({
+    id, ownerId: 'demo', status,
+    createdAt: new Date(Date.now() - ago * 60000).toISOString(), updatedAt: new Date().toISOString(),
+    input: { type: 'url', source },
+    options: { viewports: [1440, 768, 375] },
+    progress: [{ at: new Date().toISOString(), message: `viewport 1440: ${status === 'done' ? 'done' : 'loading'}` }],
+    loop: { round: 1, history: [], escalated: false },
+    verifications: [], generations: [],
+    result: status === 'done' ? {
+      snapshotDir: '', title: source.replace('https://', ''), viewports: [1440, 768, 375],
+      screenshots: { '1440': 'demo/capture.jpg' }, assetsOk: 12, assetsFailed: 1, dynamicRegions: 0,
+      dismissed: 0, domNodes: 640, durationMs: 4100,
+    } : undefined,
+    sizeBytes: status === 'done' ? 2400000 : 0,
+  })
 
+  const DEMO_TASKS = [
+    {
+      id: 'demo-20261014-1204', ownerId: 'demo', status: 'done',
+      createdAt: new Date(Date.now() - 42 * 60000).toISOString(), updatedAt: new Date().toISOString(),
+      input: { type: 'url', source: 'https://fixture.local/pricing' },
+      options: { viewports: [1440, 768, 375] },
+      progress: [{ at: new Date().toISOString(), message: 'viewport 1440: done' }],
+      loop: { round: 2, history: [{ ssim: 0.9997, pixelDiffPct: 0.03 }], escalated: false },
+      verifications: [{
+        id: 'demo-v1', round: 1, status: 'done', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        repro: { type: 'zip', source: 'kloon-repro.zip' }, reproDir: '', progress: [],
+        result: {
+          metrics: { ssim: 0.9997, pixelDiffPct: 0.03, dynamicAreaPct: 0 },
+          decision: 'pass', entries: 2, durationMs: 4200,
+          topEntries: [
+            { severity: 0.7, element: 'button.cta', property: 'boxShadow', expected: 'rgba(99,102,241,.4) 0 4px 14px', actual: 'none' },
+            { severity: 0.2, element: 'button.cta', property: 'borderRadius', expected: '12px', actual: '8px' },
+          ],
+          report: 'report.html', heatmaps: ['diffs/r1/heatmap-1440.png'],
+        },
+      }],
+      generations: [],
+      result: { snapshotDir: '', title: 'Fixture — 定价页', viewports: [1440, 768, 375], screenshots: { '1440': 'demo/capture.jpg' }, assetsOk: 41, assetsFailed: 3, dynamicRegions: 0, dismissed: 1, domNodes: 1873, durationMs: 6100 },
+      sizeBytes: 18432000,
+    },
+    {
+      id: 'demo-20261014-1132', ownerId: 'demo', status: 'running',
+      createdAt: new Date(Date.now() - 3 * 60000).toISOString(), updatedAt: new Date().toISOString(),
+      input: { type: 'url', source: 'https://fixture.local/landing' },
+      options: { viewports: [1440] },
+      progress: [
+        { at: new Date().toISOString(), message: 'viewport 1440: loading' },
+        { at: new Date().toISOString(), message: 'dynamic: 34 regions @1440' },
+        { at: new Date().toISOString(), message: 'assets: 314 ok, 495 failed' },
+      ],
+      loop: { round: 0, history: [], escalated: false },
+      verifications: [], generations: [],
+      result: undefined, sizeBytes: 0,
+    },
+    demoVariant('demo-20261014-1055', 'https://fixture.local/hero', 'done', 96),
+    demoVariant('demo-20261014-1021', 'https://fixture.local/pricing-table', 'done', 152),
+    demoVariant('demo-20261014-0958', 'https://fixture.local/docs', 'failed', 205),
+  ]
+
+  // ---------- motion ----------
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+  function revealMasked() {
+    requestAnimationFrame(() => document.body.classList.add('ready'))
+  }
+  function observeEntrances(root = document) {
+    const nodes = root.querySelectorAll('.enter:not(.in)')
+    if (reduce || !('IntersectionObserver' in window)) { nodes.forEach((n) => n.classList.add('in')); return }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (!e.isIntersecting) return
+        setTimeout(() => e.target.classList.add('in'), i * 70)
+        io.unobserve(e.target)
+      })
+    }, { rootMargin: '-40px 0px -10% 0px' })
+    nodes.forEach((n) => io.observe(n))
+  }
+  function fillBars(root = document) {
+    root.querySelectorAll('.bar i[data-pct]').forEach((el, i) => {
+      const pct = el.getAttribute('data-pct')
+      setTimeout(() => { el.style.width = pct + '%' }, reduce ? 0 : 120 + i * 90)
+    })
+  }
+
+  // ---------- auth ----------
   function renderAuth() {
     $('#sidebar').innerHTML = `
-      <h2>登录 / 注册</h2>
-      <form class="inline" id="login-form">
-        <label>邮箱<input type="email" id="login-email" required /></label>
-        <label>密码<input type="password" id="login-password" required minlength="8" /></label>
-        <div class="row"><button type="submit">登录</button>
-        <button type="button" class="ghost" id="show-register">没有账号?注册</button></div>
-      </form>
-      <form class="inline" id="register-form" style="display:none">
-        <label>邮箱<input type="email" id="reg-email" required /></label>
-        <label>密码(至少 8 位)<input type="password" id="reg-password" required minlength="8" /></label>
-        <div class="row"><button type="submit">注册</button>
-        <button type="button" class="ghost" id="show-login">已有账号?登录</button></div>
-      </form>
-      <form class="inline">
-        <label>访问令牌(私有部署可选)<input type="password" id="token" placeholder="COPYPAGE_TOKEN" /></label>
-        <button type="button" class="ghost" id="token-save">使用令牌</button>
-      </form>`
-    $('#detail').innerHTML = '<p class="hint">登录后即可提交捕获、验证与自动生成任务。</p>'
+      <div class="auth">
+        <div>
+          <h1 class="mask"><span>把网页变成代码</span></h1>
+          <p style="margin-top:16px;color:var(--muted)">捕获一个页面，读它的结构与样式，收敛到像素级一致，然后拿走 React + Tailwind 工程。</p>
+        </div>
+        <form id="login-form">
+          <label>邮箱<input type="email" id="login-email" required /></label>
+          <label>密码<input type="password" id="login-password" required minlength="8" /></label>
+          <button class="action" type="submit">登录</button>
+          <button class="swap" type="button" id="show-register">没有账号？注册</button>
+        </form>
+        <form id="register-form" hidden>
+          <label>邮箱<input type="email" id="reg-email" required /></label>
+          <label>密码（至少 8 位）<input type="password" id="reg-password" required minlength="8" /></label>
+          <button class="action" type="submit">注册</button>
+          <button class="swap" type="button" id="show-login">已有账号？登录</button>
+        </form>
+        <form id="token-form">
+          <label>访问令牌（私有部署）<input type="password" id="token" placeholder="COPYPAGE_TOKEN" /></label>
+          <button class="action ghost" type="button" id="token-save">使用令牌</button>
+        </form>
+      </div>`
+    $('#detail').innerHTML = '<p class="empty">登录后即可提交捕获、验证与自动生成任务。</p>'
     $('#whoami').textContent = ''
-    $('#logout').style.display = 'none'
-    $('#tab-admin').style.display = 'none'
+    $('#logout').hidden = true
+    $('#tab-admin').hidden = true
 
     const post = async (path, body, btn) => {
       btn.disabled = true
@@ -195,59 +457,59 @@
         await boot()
       } catch (err) { banner(err.message) } finally { btn.disabled = false }
     }
-    $('#show-register').onclick = () => { $('#login-form').style.display = 'none'; $('#register-form').style.display = 'grid' }
-    $('#show-login').onclick = () => { $('#login-form').style.display = 'grid'; $('#register-form').style.display = 'none' }
-    $('#login-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/login', { email: $('#login-email').value, password: $('#login-password').value }, e.submitter ?? e.target.querySelector('button')) }
-    $('#register-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/register', { email: $('#reg-email').value, password: $('#reg-password').value }, e.submitter ?? e.target.querySelector('button')) }
+    $('#show-register').onclick = () => { $('#login-form').hidden = true; $('#register-form').hidden = false }
+    $('#show-login').onclick = () => { $('#login-form').hidden = false; $('#register-form').hidden = true }
+    $('#login-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/login', { email: $('#login-email').value, password: $('#login-password').value }, e.target.querySelector('button[type=submit]')) }
+    $('#register-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/register', { email: $('#reg-email').value, password: $('#reg-password').value }, e.target.querySelector('button[type=submit]')) }
     $('#token-save').onclick = () => { tokenStore.set($('#token').value.trim()); location.reload() }
     $('#token').value = tokenStore.get()
+    revealMasked()
   }
 
-  // ---------- sidebar ----------
-
+  // ---------- ledger ----------
   function renderSidebar() {
-    const q = state.me?.quota
     const totals = state.me?.totals ?? { tasks: 0, storageBytes: 0 }
-    const usage = state.me?.usage ?? {}
-    const bar = (used, max, label) => {
-      const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0
-      const cls = pct >= 100 ? 'full' : pct >= 80 ? 'warn' : ''
-      return `<div><div class="muted">${label}: ${typeof used === 'number' && label.includes('存储') ? fmtBytes(used) : used} / ${label.includes('存储') ? fmtBytes(max) : max}</div><div class="qbar ${cls}"><i style="width:${pct}%"></i></div></div>`
-    }
-    const quotaHtml = q
-      ? `<div class="quota">
-           ${bar(totals.tasks, q.maxTasks, '任务数')}
-           ${bar(totals.storageBytes, q.maxStorageBytes, '存储')}
-           ${bar(usage.generate ?? 0, q.maxGenerationsPerDay, '今日生成')}
-           ${bar(usage.capture ?? 0, q.maxCapturesPerDay, '今日捕获')}
-         </div>`
-      : ''
-
+    const quota = state.me?.quota
+    const quotaLine = quota ? `本机配额 ${totals.tasks}/${quota.maxTasks} 任务 · ${fmtBytes(totals.storageBytes)}` : ''
     $('#sidebar').innerHTML = `
-      ${quotaHtml}
-      <h2>新建捕获</h2>
-      <form class="inline" id="new-task">
-        <div class="row">
-          <select id="type" style="width:110px">
-            <option value="url">URL</option>
-            <option value="image">图片路径</option>
-            <option value="video">视频路径</option>
-          </select>
-          <input type="text" id="source" placeholder="https://example.com" required />
+      <section class="intro">
+        <h1 class="mask"><span>捕获一个页面，</span></h1>
+        <h1 class="mask"><span>读回它的代码。</span></h1>
+        <p>Kloon 把可访问的页面读成结构、样式与资产，收敛到像素级一致，产出可运行的 React + Tailwind 工程。</p>
+        ${quotaLine ? `<p style="margin-top:10px;color:var(--muted);font-size:var(--step-small)">${esc(quotaLine)}</p>` : ''}
+      </section>
+
+      <form class="capture" id="new-task" data-ui>
+        <div class="capture-row enter">
+          <div class="grow">
+            <label for="source">页面地址</label>
+            <input type="text" id="source" placeholder="https://example.com" required />
+          </div>
+          <label for="type">类型
+            <select id="type"><option value="url">网址</option><option value="image">图片路径</option><option value="video">视频路径</option></select>
+          </label>
         </div>
-        <label>视口宽度(逗号分隔)<input type="text" id="viewports" value="1440,768,375" /></label>
-        <div class="checks">
+        <div class="capture-row enter">
+          <div class="grow"><label for="viewports">视口宽度（逗号分隔）</label><input type="text" id="viewports" value="1440,768,375" /></div>
+          <div class="grow"><label for="maxNodes">DOM 节点上限</label><input type="text" id="maxNodes" value="4000" /></div>
+        </div>
+        <div class="opts enter">
           <label><input type="checkbox" id="dynamic" checked /> 动态区域检测</label>
-          <label><input type="checkbox" id="states" /> 交互态捕获(慢)</label>
+          <label><input type="checkbox" id="states" /> 交互态捕获（慢）</label>
         </div>
-        <div class="row">
-          <label style="flex:1">DOM 节点上限<input type="text" id="maxNodes" value="4000" /></label>
-          <button type="submit" id="submit">开始捕获</button>
-        </div>
+        <div class="enter"><button class="action" type="submit" id="submit">开始捕获</button></div>
       </form>
-      <h2>任务</h2>
-      <ul class="tasks" id="tasks"></ul>`
+
+      <div>
+        <div class="section-head"><h2>任务账本</h2><span class="count" id="ledger-count"></span></div>
+        <div class="ledger">
+          <ul id="tasks"></ul>
+          <div class="preview" id="preview" aria-hidden="true"><img alt="" id="preview-img" /></div>
+        </div>
+      </div>`
     renderTasks()
+    fillBars($('#sidebar'))
+    observeEntrances($('#sidebar'))
 
     $('#new-task').onsubmit = async (e) => {
       e.preventDefault()
@@ -260,126 +522,257 @@
           source: $('#source').value.trim(),
           options: { viewports, maxNodes: Number($('#maxNodes').value) || 4000, dynamic: $('#dynamic').checked, states: $('#states').checked },
         }
+        if (DEMO) { demoSubmit(body.source); return }
         const res = await api('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || res.statusText)
         upsert(data.task); state.selected = data.task.id
         renderTasks(); renderDetail()
-      } catch (err) { banner('创建任务失败:' + err.message) } finally { btn.disabled = false }
+      } catch (err) { banner(err.message) } finally { btn.disabled = false }
     }
   }
 
   function renderTasks() {
     const el = $('#tasks')
     if (!el) return
-    if (state.tasks.length === 0) { el.innerHTML = '<li class="hint" style="padding:6px 10px">暂无任务</li>'; return }
-    el.innerHTML = state.tasks.map((t) => `
-      <li data-id="${t.id}" class="${state.selected === t.id ? 'active' : ''}">
-        <div class="line1"><span class="src">${esc(t.input.source)}</span><span class="chip ${t.status}">${STATUS[t.status]}</span></div>
-        <div class="line1"><span class="time">${esc(t.id)} · ${fmtTime(t.createdAt)}</span></div>
-      </li>`).join('')
-    for (const li of el.querySelectorAll('li[data-id]')) li.onclick = () => { state.selected = li.dataset.id; renderTasks(); renderDetail() }
+    const n = state.tasks.length
+    const count = $('#ledger-count')
+    if (count) count.textContent = n ? `${n} 个` : ''
+    if (!n) { el.innerHTML = '<li><p class="empty">还没有任务。在上面填一个地址开始。</p></li>'; return }
+    el.innerHTML = state.tasks.map((t, i) => {
+      const shot = t.result?.screenshots?.[String(t.result?.viewports?.[0])] ?? ''
+      const metric = t.result?.metrics ?? t.verifications?.at(-1)?.result?.metrics
+      const thumb = shot && i < 3 ? `<span class="thumb"><img src="${esc(shot)}" alt="任务 ${esc(t.input.source)} 的捕获截图" width="640" height="400" /></span>` : ''
+      return `<li>
+        <button class="row enter ${state.selected === t.id ? 'selected' : ''}" data-id="${t.id}" data-shot="${esc(shot)}">
+          ${thumb}
+          <span class="name">${esc(t.input.source)}</span>
+          <span class="kind">${esc(t.id)} · ${fmtTime(t.createdAt)}</span>
+          <span class="metric"><b class="state ${t.status}">${STATUS[t.status]}</b>${metric ? `<span>SSIM ${metric.ssim}</span>` : ''}</span>
+        </button>
+      </li>`
+    }).join('')
+    observeEntrances(el)
+
+    const preview = $('#preview')
+    const previewImg = $('#preview-img')
+    for (const row of el.querySelectorAll('.row')) {
+      row.onclick = () => { state.selected = row.dataset.id; renderTasks(); renderDetail() }
+      if (!preview) continue
+      row.addEventListener('pointerenter', () => {
+        const src = row.dataset.shot
+        if (!src) return
+        previewImg.src = src
+        preview.style.top = row.offsetTop + 'px'
+        preview.classList.add('on')
+      })
+      row.addEventListener('pointerleave', () => preview.classList.remove('on'))
+      row.addEventListener('focus', () => {
+        const src = row.dataset.shot
+        if (!src) return
+        previewImg.src = src
+        preview.style.top = row.offsetTop + 'px'
+        preview.classList.add('on')
+      })
+      row.addEventListener('blur', () => preview.classList.remove('on'))
+    }
   }
 
   // ---------- detail ----------
+  // demo mode serves bundled artifacts straight from /demo/* (real captures of our own fixture)
+  const artifactUrl = (t, rel) => rel.startsWith('demo/') ? '/' + rel : `/api/tasks/${t.id}/artifacts/${rel}`
+  const fileUrl = (t, rel) => DEMO ? '/' + (rel.includes('heatmap') ? 'demo/heatmap.jpg' : 'demo/repro.jpg') : `/api/tasks/${t.id}/files/${rel}`
 
-  const artifactUrl = (t, rel) => `/api/tasks/${t.id}/artifacts/${rel}`
-  const fileUrl = (t, rel) => `/api/tasks/${t.id}/files/${rel}`
+  function figures(t, metrics) {
+    if (!metrics) return ''
+    const pct = (v) => Math.max(2, Math.min(100, Math.round(v * 100)))
+    return `<div class="figures">
+      <div class="figure ${metrics.ssim >= 0.98 ? 'pass' : ''}"><b>${metrics.ssim}</b><span>SSIM 结构相似度</span><div class="bar"><i data-pct="${pct(metrics.ssim)}"></i></div></div>
+      <div class="figure ${metrics.pixelDiffPct <= 2 ? 'pass' : ''}"><b>${metrics.pixelDiffPct}%</b><span>像素差异</span><div class="bar"><i data-pct="${Math.min(100, metrics.pixelDiffPct * 4)}"></i></div></div>
+      ${metrics.dynamicAreaPct !== undefined ? `<div class="figure"><b>${metrics.dynamicAreaPct}%</b><span>动态区域（不参与比对）</span><div class="bar"><i data-pct="${Math.min(100, metrics.dynamicAreaPct * 2)}"></i></div></div>` : ''}
+    </div>`
+  }
 
   function renderGenerations(t) {
     if (t.status !== 'done') return ''
     const runs = [...(t.generations || [])].reverse()
-    const runsHtml = runs.map((g) => {
-      const rounds = g.rounds && g.rounds.length
-        ? `<div class="vmetrics">${g.rounds.map((r) => `<div class="m">第 ${r.round} 轮 ${esc(DECISION[r.decision] || r.decision)}<b>${r.metrics.ssim} / ${r.metrics.pixelDiffPct}%</b></div>`).join('')}</div>`
-        : ''
-      const log = g.progress && g.progress.length
-        ? `<div class="vlog">${g.progress.slice(-40).map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')}</div>`
-        : ''
-      return `<div class="vrun">
-        <div class="vhead"><b>生成运行 ${esc(g.id)}</b>
-          <span class="chip ${g.status}">${VSTATUS[g.status]}</span>
-          ${g.finalDecision ? `<span class="chip ${g.finalDecision}">${DECISION[g.finalDecision] || g.finalDecision}</span>` : ''}
-          <span class="time">${esc(g.agent.command)}${g.agent.model ? ' (' + esc(g.agent.model) + ')' : ''} · ${fmtTime(g.createdAt)}</span>
+    if (!runs.length) return `
+      <section class="detail-block enter">
+        <div class="section-head" style="margin:0 0 18px"><h2>自动生成</h2></div>
+        <div class="vform">
+          <button class="action" id="generate-btn">启动自动生成</button>
+          <p style="margin-top:12px;color:var(--muted);font-size:var(--step-small)">agent 按 copypage skill 读取快照生成工程，每轮由服务端验证并回传差异清单。</p>
         </div>
-        ${g.error ? `<div class="error">${esc(g.error)}</div>` : ''}${rounds}${log}</div>`
-    }).join('')
+      </section>`
     return `
-      <h2 style="padding:18px 0 0">自动生成还原工程</h2>
-      <div class="vform">
-        <button id="generate-btn">启动自动生成</button>
-        <div class="note">agent(pi)按 copypage skill 读取快照生成工程,每轮由服务端验证并回传差异清单,直到收敛。</div>
+      <section class="detail-block enter">
+        <div class="section-head" style="margin:0 0 18px"><h2>自动生成</h2><span class="count">${runs.length} 次运行</span></div>
+        <div class="stack">
+          ${runs.map((g) => `
+            <article class="run">
+              <div class="run-head">
+                <span class="title">${esc(g.agent.command)}${g.agent.model ? ' · ' + esc(g.agent.model) : ''}</span>
+                <span class="verdict"><span class="state ${g.status}">${VSTATUS[g.status]}</span>${g.finalDecision ? ' · ' + esc(DECISION[g.finalDecision] || g.finalDecision) : ''}</span>
+                <span class="when">${esc(g.id)} · ${fmtTime(g.createdAt)}</span>
+              </div>
+              ${g.error ? `<p style="color:var(--accent);font-size:var(--step-small);margin-top:12px">${esc(g.error)}</p>` : ''}
+              ${g.rounds?.length ? `<div class="run-body">${g.rounds.map((r) => `<p style="font-size:var(--step-small)">第 ${r.round} 轮 · ${esc(DECISION[r.decision] || r.decision)} · SSIM ${r.metrics.ssim} · 像素差异 ${r.metrics.pixelDiffPct}%</p>`).join('')}</div>` : ''}
+              ${g.progress?.length ? `<pre class="log compact">${esc(g.progress.slice(-30).map((p) => `${fmtTime(p.at)}  ${p.message}`).join('\n'))}</pre>` : ''}
+            </article>`).join('')}
+        </div>
+      </section>`
+  }
+
+  function renderVerifications(t) {
+    if (t.status !== 'done') return ''
+    const runs = [...(t.verifications || [])].reverse()
+    const rows = runs.map((v) => {
+      const r = v.result
+      const links = r ? `<div class="run-links">
+          <a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.report)}" target="_blank" rel="noreferrer">对比报告</a>
+          ${r.heatmaps.map((h) => `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + h)}" target="_blank" rel="noreferrer">热力图 ${h.match(/heatmap-(\d+)/)?.[1] ?? ''}px</a>`).join('')}
+          ${r.vlmRequests ? `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.vlmRequests)}" target="_blank" rel="noreferrer">VLM 队列</a>` : ''}
+        </div>` : ''
+      const entries = r?.topEntries?.length ? `<table class="entries">
+          <thead><tr><th>severity</th><th>元素</th><th>属性</th><th>原站</th><th>还原</th></tr></thead>
+          <tbody>${r.topEntries.map((e) => `<tr><td class="sev">${e.severity}</td><td>${esc(e.element)}</td><td>${esc(e.property)}</td><td>${esc(e.expected)}</td><td>${esc(e.actual)}</td></tr>`).join('')}</tbody>
+        </table>` : ''
+      return `<article class="run">
+        <div class="run-head">
+          <span class="title">第 ${v.round} 轮 · ${esc(v.repro.type)} ${esc(v.repro.source)}</span>
+          <span class="verdict"><span class="state ${v.status}">${VSTATUS[v.status]}</span>${r ? ' · ' + esc(DECISION[r.decision] || r.decision) : ''}</span>
+          <span class="when">${fmtTime(v.createdAt)}</span>
+        </div>
+        ${v.error ? `<p style="color:var(--accent);font-size:var(--step-small);margin-top:12px;white-space:pre-wrap">${esc(v.error)}</p>` : ''}
+        <div class="run-body">${links}${entries}${v.progress.length ? `<pre class="log compact">${esc(v.progress.map((p) => `${fmtTime(p.at)}  ${p.message}`).join('\n'))}</pre>` : ''}</div>
+      </article>`
+    }).join('')
+    const history = (t.loop?.history || []).length
+      ? `<p style="color:var(--muted);font-size:var(--step-small);margin-bottom:18px">收敛历史 ${t.loop.history.map((h, i) => `r${i + 1} ${h.ssim}/${h.pixelDiffPct}%`).join(' → ')}${t.loop.escalated ? ' · 已升级诊断' : ''}</p>`
+      : ''
+    return `
+      <section class="detail-block enter">
+        <div class="section-head" style="margin:0 0 18px"><h2>验证还原页</h2><span class="count">${runs.length} 轮</span></div>
+        <form class="admin-forms" id="verify-form" data-ui>
+          <div class="row">
+            <input type="text" id="verify-path" placeholder="还原工程目录（管理员可填服务器路径）" style="flex:1 1 260px" />
+            <button class="action ghost small" type="button" id="verify-path-btn">验证路径</button>
+            <button class="action ghost small" type="button" id="verify-zip-btn">上传 zip 验证</button>
+            <input type="file" id="verify-zip" accept=".zip" hidden />
+          </div>
+          <p style="color:var(--muted);font-size:var(--step-small)">构建 + 同一套探测脚本 → 像素/DOM 比对（动态区域遮罩）→ 报告 → 收敛判定。普通账号请用 zip。</p>
+        </form>
+        ${history}
+        <div class="stack">${rows || '<p class="empty">还没有验证记录。</p>'}</div>
+      </section>`
+  }
+
+  function renderDetail() {
+    const el = $('#detail')
+    if (state.view === 'admin') { renderAdmin(el); return }
+    const t = state.tasks.find((x) => x.id === state.selected)
+    if (!t) { el.innerHTML = '<p class="empty">创建或选择一个任务查看详情。</p>'; return }
+    const keepPath = $('#verify-path')?.value ?? ''
+    const r = t.result
+    const vp = r?.viewports?.[0] ?? t.options?.viewports?.[0] ?? 1440
+    const shot = r?.screenshots?.[String(vp)] ?? ''
+    const verificationMetrics = t.verifications?.at(-1)?.result?.metrics
+    const lastVerify = t.verifications?.at(-1)
+
+    const reproSrc = lastVerify ? fileUrl(t, 'verifications/' + lastVerify.id + '/repro-snap/screenshots/' + vp + '.png') : ''
+    const heatSrc = lastVerify?.result?.heatmaps?.[0] ? fileUrl(t, 'verifications/' + lastVerify.id + '/' + lastVerify.result.heatmaps[0]) : ''
+    const halves = shot ? `
+      <div class="halves enter">
+        <figure>
+          <figcaption>输入 · 原站截图 ${vp}px</figcaption>
+          <div class="frame"><img src="${artifactUrl(t, shot)}" alt="原站 ${esc(t.input.source)} 在 ${vp}px 下的捕获" width="1440" height="900" /></div>
+        </figure>
+        <figure>
+          <figcaption>输出 · 还原页同视口</figcaption>
+          <div class="frame">${reproSrc ? `<img src="${reproSrc}" alt="还原页在 ${vp}px 下的截图" width="1440" height="900" />` : '<p class="empty" style="padding:28px 16px">提交还原工程后在这里出现对照。</p>'}</div>
+        </figure>
+      </div>${heatSrc ? `
+      <figure class="band enter">
+        <figcaption>差异热力图 · 红色为像素差异，蓝色为被排除的动态区域</figcaption>
+        <div class="frame"><img src="${heatSrc}" alt="原站与还原页的像素差异热力图" width="1440" height="900" /></div>
+      </figure>` : ''}` : ''
+
+    const facts = [
+      r?.title ? ['页面标题', esc(r.title)] : null,
+      ['状态', `<span class="state ${t.status}">${STATUS[t.status]}</span>`],
+      ['视口', (r?.viewports ?? t.options?.viewports ?? []).join(' / ') || '默认'],
+      r ? ['DOM 节点', r.domNodes ?? '—'] : null,
+      r ? ['资产', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`] : null,
+      r ? ['动态区域', `${r.dynamicRegions} 处`] : null,
+      r ? ['自动关闭弹窗', r.dismissed] : null,
+      r ? ['耗时', fmtDuration(r.durationMs)] : null,
+      t.worker?.pid ? ['Worker PID', t.worker.pid] : null,
+      t.sizeBytes ? ['占用', fmtBytes(t.sizeBytes)] : null,
+    ].filter(Boolean)
+
+    const progress = t.progress.length ? t.progress.map((p) => `${fmtTime(p.at)}  ${p.message}`).join('\n') : '（等待进度输出…）'
+
+    el.innerHTML = `
+      <div class="detail-block enter">
+        <div class="detail-head">
+          <h3>${esc(t.input.source)}</h3>
+          <span class="id">${esc(t.id)}</span>
+          ${t.status === 'done' || t.status === 'failed' ? '<button class="action danger small" id="delete-task" style="margin-left:auto">删除任务</button>' : ''}
+        </div>
+        ${halves}
+        ${figures(t, verificationMetrics)}
+        <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+        ${t.error ? `<p style="color:var(--accent);font-size:var(--step-small);margin-top:20px;white-space:pre-wrap">${esc(t.error)}</p>` : ''}
       </div>
-      ${runsHtml || '<p class="hint" style="padding:0">还没有生成记录</p>'}`
+
+      <section class="detail-block enter">
+        <div class="section-head" style="margin:0 0 18px"><h2>捕获过程</h2></div>
+        <pre class="log" id="log">${esc(progress)}</pre>
+      </section>
+
+      ${renderGenerations(t)}
+      ${renderVerifications(t)}`
+
+    if (keepPath && $('#verify-path')) $('#verify-path').value = keepPath
+    observeEntrances(el)
+    fillBars(el)
+    wireGeneration(t)
+    wireVerification(t)
+    const del = $('#delete-task')
+    if (del) del.onclick = async () => {
+      if (!confirm('删除该任务及其全部产物？')) return
+      if (DEMO) { state.tasks = state.tasks.filter((x) => x.id !== t.id); state.selected = state.tasks[0]?.id ?? null; renderTasks(); renderDetail(); return }
+      try {
+        const res = await api(`/api/tasks/${t.id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error(((await res.json()) || {}).error || res.statusText)
+        state.tasks = state.tasks.filter((x) => x.id !== t.id)
+        state.selected = state.tasks[0]?.id ?? null
+        renderTasks(); renderDetail()
+      } catch (err) { banner(err.message) }
+    }
+    const log = $('#log')
+    if (log) log.scrollTop = log.scrollHeight
   }
 
   function wireGeneration(t) {
     const btn = $('#generate-btn')
-    if (!btn) return
-    btn.onclick = async () => {
+    if (btn) btn.onclick = async () => {
+      if (DEMO) return banner('演示模式：自动生成需要服务端 --allow-agent。')
       btn.disabled = true
       try {
         const res = await api(`/api/tasks/${t.id}/generate`, { method: 'POST' })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || res.statusText)
         upsert(data.task); renderTasks(); renderDetail()
-      } catch (err) { banner('启动生成失败:' + err.message) } finally { btn.disabled = false }
+      } catch (err) { banner(err.message) } finally { btn.disabled = false }
     }
-  }
-
-  function renderVerifications(t) {
-    if (t.status !== 'done') return ''
-    const runs = [...(t.verifications || [])].reverse()
-    const runsHtml = runs.map((v) => {
-      const r = v.result
-      const metrics = r
-        ? `<div class="vmetrics">
-             <div class="m">SSIM<b>${r.metrics.ssim}</b></div>
-             <div class="m">像素差异<b>${r.metrics.pixelDiffPct}%</b></div>
-             ${r.metrics.dynamicAreaPct !== undefined ? `<div class="m">动态区域<b>${r.metrics.dynamicAreaPct}%</b></div>` : ''}
-             <div class="m">差异条目<b>${r.entries}</b></div>
-             <div class="m">耗时<b>${fmtDuration(r.durationMs)}</b></div>
-           </div>`
-        : ''
-      const links = r
-        ? `<div class="vlinks">
-             <a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.report)}" target="_blank">对比报告 ↗</a>
-             ${r.heatmaps.map((h) => `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + h)}" target="_blank">热力图 ${h.match(/heatmap-(\d+)/)?.[1] ?? ''}px ↗</a>`).join('')}
-             ${r.vlmRequests ? `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.vlmRequests)}" target="_blank">VLM 请求队列 ↗</a>` : ''}
-           </div>`
-        : ''
-      const entries = r && r.topEntries.length
-        ? `<table class="entries"><thead><tr><th>severity</th><th>元素</th><th>属性</th><th>原站</th><th>还原</th></tr></thead>
-           <tbody>${r.topEntries.map((e) => `<tr><td class="sev">${e.severity}</td><td>${esc(e.element)}</td><td>${esc(e.property)}</td><td class="exp">${esc(e.expected)}</td><td class="act">${esc(e.actual)}</td></tr>`).join('')}</tbody></table>`
-        : ''
-      const log = v.progress.length ? `<div class="vlog">${v.progress.map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n')}</div>` : ''
-      return `<div class="vrun" data-vid="${v.id}">
-        <div class="vhead"><b>第 ${v.round} 轮</b>
-          <span class="chip ${v.status}">${VSTATUS[v.status]}</span>
-          ${r ? `<span class="chip ${r.decision}">${DECISION[r.decision] || r.decision}</span>` : ''}
-          <span class="time">${esc(v.repro.type)}: ${esc(v.repro.source)} · ${fmtTime(v.createdAt)}</span>
-        </div>
-        ${v.error ? `<div class="error">${esc(v.error)}</div>` : ''}${metrics}${links}${entries}${log}</div>`
-    }).join('')
-    const history = (t.loop?.history || []).length
-      ? `<div class="muted" style="margin-bottom:8px">收敛历史:${t.loop.history.map((h, i) => `r${i + 1} ${h.ssim}/${h.pixelDiffPct}%`).join(' → ')}${t.loop.escalated ? ' · 已升级诊断' : ''}</div>`
-      : ''
-    return `
-      <h2 style="padding:18px 0 0">验证还原页</h2>
-      <div class="vform">
-        <input type="text" id="verify-path" placeholder="还原工程目录(管理员可用服务器本地路径)" />
-        <button id="verify-path-btn">验证路径</button>
-        <button class="ghost" id="verify-zip-btn">上传 zip 并验证</button>
-        <input type="file" id="verify-zip" accept=".zip" style="display:none" />
-        <div class="note">流水线与本地一致:captureRepro(构建 + 同一探测脚本)→ diff(动态区域遮罩)→ 报告 → 收敛判定。普通租户请用 zip 上传。</div>
-      </div>
-      ${history}${runsHtml || '<p class="hint" style="padding:0">还没有验证记录</p>'}`
   }
 
   function wireVerification(t) {
     const pathInput = $('#verify-path'), pathBtn = $('#verify-path-btn'), zipBtn = $('#verify-zip-btn'), zipInput = $('#verify-zip')
     if (!pathBtn || !zipBtn) return
     const post = async (body, headers = {}) => {
+      if (DEMO) throw new Error('演示模式：验证需要真实服务端。')
       const res = await api(`/api/tasks/${t.id}/verifications`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || res.statusText)
@@ -387,236 +780,195 @@
     }
     pathBtn.onclick = async () => {
       const source = pathInput.value.trim()
-      if (!source) return banner('请输入还原工程路径')
+      if (!source) return banner('请先填写还原工程目录。')
       pathBtn.disabled = true
       try { const data = await post(JSON.stringify({ repro: { type: 'path', source } })); upsert(data.task); renderTasks(); renderDetail() }
-      catch (err) { banner('验证失败:' + err.message) } finally { pathBtn.disabled = false }
+      catch (err) { banner(err.message) } finally { pathBtn.disabled = false }
     }
     zipBtn.onclick = () => zipInput.click()
     zipInput.onchange = async () => {
-      const file = zipInput.files && zipInput.files[0]
+      const file = zipInput.files?.[0]
       if (!file) return
       zipBtn.disabled = true
       try { const data = await post(file, { 'content-type': 'application/zip', 'x-filename': file.name }); upsert(data.task); renderTasks(); renderDetail() }
-      catch (err) { banner('上传失败:' + err.message) } finally { zipBtn.disabled = false; zipInput.value = '' }
+      catch (err) { banner(err.message) } finally { zipBtn.disabled = false; zipInput.value = '' }
     }
-  }
-
-  function renderDetail() {
-    const el = $('#detail')
-    if (state.view === 'admin') { renderAdmin(el); return }
-    const t = state.tasks.find((x) => x.id === state.selected)
-    if (!t) { el.innerHTML = '<p class="hint">创建或选择一个任务查看详情。</p>'; return }
-    const keepPath = $('#verify-path') ? $('#verify-path').value : ''
-    const r = t.result
-    const cells = [
-      r?.title ? ['页面标题', esc(r.title)] : null,
-      ['状态', `<span class="chip ${t.status}">${STATUS[t.status]}</span>`],
-      ['耗时', r ? fmtDuration(r.durationMs) : '—'],
-      ['视口', r ? r.viewports.join(', ') : (t.options.viewports || []).join(', ') || '默认'],
-      r ? ['DOM 节点', r.domNodes ?? '—'] : null,
-      r ? ['资产', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`] : null,
-      r ? ['动态区域', `${r.dynamicRegions} 处`] : null,
-      r ? ['自动关闭弹窗', r.dismissed] : null,
-      t.worker?.pid ? ['Worker PID', t.worker.pid] : null,
-      t.sizeBytes ? ['占用', fmtBytes(t.sizeBytes)] : null,
-    ].filter(Boolean)
-    const shots = r ? Object.entries(r.screenshots).map(([w, rel]) => `
-      <div class="shot"><div class="bar"><span>${w}px 全页截图</span><a href="${artifactUrl(t, rel)}" target="_blank">打开原图 ↗</a></div>
-      <a href="${artifactUrl(t, rel)}" target="_blank"><img loading="lazy" src="${artifactUrl(t, rel)}" alt="" /></a></div>`).join('') : ''
-    const links = r ? [
-      ['snapshot.json', 'snapshot.json'], ['meta.json', 'meta.json'], ['dynamic.json', 'dynamic.json'],
-      ['dismissed.json', 'dismissed.json'], ['assets-failed.json', 'assets-failed.json'],
-      ...r.viewports.map((w) => [`dom/${w}.json`, `dom/${w}.json`]),
-    ].map(([label, rel]) => `<a href="${artifactUrl(t, rel)}" target="_blank">${esc(label)}</a>`).join('') : ''
-    const progress = t.progress.length ? t.progress.map((p) => `${fmtTime(p.at)}  ${esc(p.message)}`).join('\n') : '(等待进度输出…)'
-    const canDelete = t.status === 'done' || t.status === 'failed'
-    el.innerHTML = `
-      <div class="detail">
-        <div class="head">
-          <h3>${esc(t.input.source)}</h3><span class="id">${esc(t.id)}</span>
-          ${canDelete ? '<button class="danger small" id="delete-task">删除任务</button>' : ''}
-        </div>
-        <div class="grid">${cells.map(([k, v]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
-        ${t.error ? `<div class="error">${esc(t.error)}</div>` : ''}
-        <h2 style="padding:6px 0 8px">进度</h2>
-        <div class="log" id="log">${progress}</div>
-        ${shots ? `<h2 style="padding:18px 0 0">截图</h2><div class="shots">${shots}</div>` : ''}
-        ${links ? `<div class="links">${links}</div>` : ''}
-        ${renderGenerations(t)}
-        ${renderVerifications(t)}
-      </div>`
-    if (keepPath && $('#verify-path')) $('#verify-path').value = keepPath
-    wireGeneration(t); wireVerification(t)
-    const del = $('#delete-task')
-    if (del) del.onclick = async () => {
-      if (!confirm('删除该任务及其全部产物?')) return
-      try {
-        const res = await api(`/api/tasks/${t.id}`, { method: 'DELETE' })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || res.statusText)
-        state.tasks = state.tasks.filter((x) => x.id !== t.id)
-        state.selected = state.tasks[0]?.id ?? null
-        renderTasks(); renderDetail()
-      } catch (err) { banner('删除失败:' + err.message) }
-    }
-    const log = $('#log'); if (log) log.scrollTop = log.scrollHeight
   }
 
   // ---------- admin ----------
-
   async function renderAdmin(el) {
-    el.innerHTML = '<p class="hint">加载管理数据…</p>'
+    el.innerHTML = '<p class="empty">正在载入管理数据…</p>'
+    if (DEMO) { el.innerHTML = '<p class="empty">演示模式：管理台需要登录真实账号。</p>'; return }
     try {
       const [users, blocks, audit, stats, warnings] = await Promise.all([
         api('/api/admin/users').then((r) => r.json()),
         api('/api/admin/blocks').then((r) => r.json()),
-        api('/api/admin/audit?limit=100').then((r) => r.json()),
+        api('/api/admin/audit?limit=60').then((r) => r.json()),
         api('/api/admin/stats').then((r) => r.json()),
         api('/api/admin/warnings').then((r) => r.json()),
       ])
-      state.admin = { users: users.users, blocks: blocks.blocks, audit: audit.entries, stats, warnings: warnings.warnings }
-    } catch (err) { el.innerHTML = `<p class="hint">加载失败:${esc(err.message)}</p>`; return }
+      const s = stats
+      el.innerHTML = `
+        <div class="detail-block">
+          <dl class="facts">
+            <div><dt>用户</dt><dd>${s.users} ｜ 暂停 ${s.suspended}</dd></div>
+            <div><dt>任务</dt><dd>${s.tasks}</dd></div>
+            <div><dt>存储</dt><dd>${fmtBytes(s.storageBytes)}</dd></div>
+            <div><dt>队列</dt><dd>${s.queue}</dd></div>
+          </dl>
+        </div>
+        <section class="detail-block enter">
+          <div class="section-head" style="margin:0 0 18px"><h2>用户</h2></div>
+          <table><thead><tr><th>邮箱</th><th>角色 / 状态</th><th>套餐</th><th>用量</th><th>操作</th></tr></thead>
+          <tbody>${users.users.map((u) => `
+            <tr>
+              <td>${esc(u.email)}<div class="sub">${esc(u.id)}</div></td>
+              <td>${esc(u.role)} / ${esc(u.status)}</td>
+              <td>${esc(u.plan)}</td>
+              <td class="sub">任务 ${u.totals.tasks} ｜ ${fmtBytes(u.totals.storageBytes)}</td>
+              <td><div class="row">
+                <button class="action ghost small" data-act="toggle" data-id="${u.id}">${u.status === 'suspended' ? '恢复' : '暂停'}</button>
+                <select data-act="plan" data-id="${u.id}">${['free', 'pro', 'unlimited'].map((p) => `<option value="${p}" ${p === u.plan ? 'selected' : ''}>${p}</option>`).join('')}</select>
+              </div></td>
+            </tr>`).join('')}</tbody></table>
+        </section>
+        <section class="detail-block enter">
+          <div class="section-head" style="margin:0 0 18px"><h2>域名封禁</h2></div>
+          <div class="admin-forms"><div class="row">
+            <input type="text" id="block-value" placeholder="example.com（含子域）" style="flex:1 1 240px" />
+            <button class="action small" id="block-add">封禁</button>
+          </div></div>
+          <table><tbody>${blocks.blocks.map((b) => `<tr><td>${esc(b.kind)}: ${esc(b.value)}</td><td class="sub">${esc(b.note ?? '')}</td><td><button class="action danger small" data-unblock="${b.id}">解除</button></td></tr>`).join('') || '<tr><td class="sub">暂无封禁</td></tr>'}</tbody></table>
+        </section>
+        <section class="detail-block enter">
+          <div class="section-head" style="margin:0 0 18px"><h2>预警提示</h2></div>
+          <div class="admin-forms"><div class="row">
+            <select id="warn-user" style="flex:1 1 220px">${users.users.map((u) => `<option value="${u.id}">${esc(u.email)}</option>`).join('')}</select>
+            <input type="text" id="warn-message" placeholder="给该用户发送提醒（界面 + 邮件）" style="flex:2 1 280px" />
+            <button class="action small" id="warn-send">发送</button>
+          </div></div>
+          <table><thead><tr><th>时间</th><th>用户</th><th>类型</th><th>内容</th><th></th></tr></thead>
+          <tbody>${(warnings.warnings ?? []).map((w) => `<tr>
+            <td class="sub">${fmtTime(w.created_at)}</td>
+            <td class="sub">${esc(users.users.find((u) => u.id === w.user_id)?.email ?? w.user_id ?? '-')}</td>
+            <td>${esc(w.kind)}</td><td>${esc(w.message)}</td>
+            <td><button class="action danger small" data-del-warning="${w.id}">删除</button></td></tr>`).join('') || '<tr><td class="sub">暂无预警</td></tr>'}</tbody></table>
+        </section>
+        <section class="detail-block enter">
+          <div class="section-head" style="margin:0 0 18px"><h2>审计日志</h2></div>
+          <table><thead><tr><th>时间</th><th>操作</th><th>对象</th></tr></thead>
+          <tbody>${audit.entries.map((a) => `<tr><td class="sub">${fmtTime(a.at)}</td><td>${esc(a.action)}</td><td class="sub">${esc(a.actor_id ?? '-')}</td></tr>`).join('')}</tbody></table>
+        </section>`
 
-    const { users, blocks, audit, stats, warnings } = state.admin
-    el.innerHTML = `
-      <div class="detail">
-        <div class="grid">
-          <div class="cell"><div class="k">用户</div><div class="v">${stats.users} ｜ 暂停 ${stats.suspended}</div></div>
-          <div class="cell"><div class="k">任务</div><div class="v">${stats.tasks}</div></div>
-          <div class="cell"><div class="k">存储</div><div class="v">${fmtBytes(stats.storageBytes)}</div></div>
-          <div class="cell"><div class="k">队列</div><div class="v">${stats.queue}</div></div>
-        </div>
-        <h2 style="padding:10px 0 8px">用户</h2>
-        <table class="admin"><thead><tr><th>邮箱</th><th>角色/状态</th><th>套餐</th><th>用量</th><th></th></tr></thead>
-        <tbody>${users.map((u) => `
-          <tr><td>${esc(u.email)}<div class="muted">${esc(u.id)}</div></td>
-            <td>${esc(u.role)} / ${esc(u.status)}</td>
-            <td>${esc(u.plan)}</td>
-            <td class="muted">任务 ${u.totals.tasks} ｜ 存储 ${fmtBytes(u.totals.storageBytes)}</td>
-            <td class="row">
-              <button class="ghost small" data-act="toggle" data-id="${u.id}">${u.status === 'suspended' ? '恢复' : '暂停'}</button>
-              <select class="small" data-act="plan" data-id="${u.id}" style="height:26px">
-                ${['free', 'pro', 'unlimited'].map((p) => `<option value="${p}" ${p === u.plan ? 'selected' : ''}>${p}</option>`).join('')}
-              </select>
-            </td></tr>`).join('')}</tbody></table>
-        <h2 style="padding:18px 0 8px">域名封禁</h2>
-        <div class="vform">
-          <input type="text" id="block-value" placeholder="example.com(含子域)" />
-          <button id="block-add">封禁</button>
-        </div>
-        <table class="admin"><tbody>${blocks.map((b) => `
-          <tr><td>${esc(b.kind)}: ${esc(b.value)}</td><td class="muted">${esc(b.note ?? '')}</td>
-          <td><button class="danger small" data-unblock="${b.id}">解除</button></td></tr>`).join('') || '<tr><td class="muted">暂无封禁</td></tr>'}</tbody></table>
-        <h2 style="padding:18px 0 8px">预警提示</h2>
-        <div class="vform">
-          <select id="warn-user" style="flex:1">${users.map((u) => `<option value="${u.id}">${esc(u.email)}</option>`).join('')}</select>
-          <input type="text" id="warn-message" placeholder="给该用户发送提醒(会显示在其界面,并发送邮件)" />
-          <button id="warn-send">发送提醒</button>
-        </div>
-        <table class="admin"><thead><tr><th>时间</th><th>用户</th><th>类型</th><th>内容</th><th></th></tr></thead>
-        <tbody>${(warnings ?? []).map((w) => `
-          <tr><td class="muted">${fmtTime(w.created_at)}</td>
-              <td class="muted">${esc(users.find((u) => u.id === w.user_id)?.email ?? w.user_id ?? '-')}</td>
-              <td>${esc(w.kind)}</td>
-              <td>${esc(w.message)}</td>
-              <td><button class="danger small" data-del-warning="${w.id}">删除</button></td></tr>`).join('') ||
-          '<tr><td class="muted">暂无预警</td></tr>'}</tbody></table>
-        <h2 style="padding:18px 0 8px">审计日志</h2>
-        <table class="admin"><thead><tr><th>时间</th><th>操作</th><th>对象</th></tr></thead>
-        <tbody>${audit.map((a) => `<tr><td class="muted">${fmtTime(a.at)}</td><td>${esc(a.action)}</td><td class="muted">${esc(a.actor_id ?? '-')}</td></tr>`).join('')}</tbody></table>
-      </div>`
-
-    for (const btn of el.querySelectorAll('[data-act]')) {
-      if (btn.dataset.act === 'toggle') btn.onclick = async () => {
-        const user = state.admin.users.find((u) => u.id === btn.dataset.id)
-        const status = user.status === 'suspended' ? 'active' : 'suspended'
-        const res = await api(`/api/admin/users/${user.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status }) })
-        if (!res.ok) banner('操作失败:' + ((await res.json()).error || res.statusText))
+      for (const btn of el.querySelectorAll('[data-act=toggle]')) btn.onclick = async () => {
+        const user = users.users.find((u) => u.id === btn.dataset.id)
+        const res = await api(`/api/admin/users/${user.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: user.status === 'suspended' ? 'active' : 'suspended' }) })
+        if (!res.ok) banner(((await res.json()) || {}).error || res.statusText)
         renderAdmin(el)
       }
-    }
-    for (const sel of el.querySelectorAll('select[data-act=plan]')) {
-      sel.onchange = async () => {
+      for (const sel of el.querySelectorAll('select[data-act=plan]')) sel.onchange = async () => {
         const res = await api(`/api/admin/users/${sel.dataset.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: sel.value }) })
-        if (!res.ok) banner('操作失败:' + ((await res.json()).error || res.statusText))
+        if (!res.ok) banner(((await res.json()) || {}).error || res.statusText)
         renderAdmin(el)
       }
-    }
-    for (const btn of el.querySelectorAll('[data-unblock]')) {
-      btn.onclick = async () => {
-        await api(`/api/admin/blocks/${btn.dataset.unblock}`, { method: 'DELETE' })
+      for (const btn of el.querySelectorAll('[data-unblock]')) btn.onclick = async () => { await api(`/api/admin/blocks/${btn.dataset.unblock}`, { method: 'DELETE' }); renderAdmin(el) }
+      for (const btn of el.querySelectorAll('[data-del-warning]')) btn.onclick = async () => { await api(`/api/admin/warnings/${btn.dataset.delWarning}`, { method: 'DELETE' }); renderAdmin(el) }
+      $('#block-add').onclick = async () => {
+        const value = $('#block-value').value.trim()
+        if (!value) return
+        const res = await api('/api/admin/blocks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'domain', value }) })
+        if (!res.ok) banner(((await res.json()) || {}).error || res.statusText)
         renderAdmin(el)
       }
-    }
-    $('#block-add').onclick = async () => {
-      const value = $('#block-value').value.trim()
-      if (!value) return
-      const res = await api('/api/admin/blocks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'domain', value }) })
-      if (!res.ok) banner('封禁失败:' + ((await res.json()).error || res.statusText))
-      renderAdmin(el)
-    }
-    $('#warn-send').onclick = async () => {
-      const userId = $('#warn-user').value
-      const message = $('#warn-message').value.trim()
-      if (!userId || !message) return banner('请填写提醒内容')
-      const res = await api('/api/admin/warnings', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId, message }),
-      })
-      if (!res.ok) banner('发送失败:' + ((await res.json()).error || res.statusText))
-      renderAdmin(el)
-    }
-    for (const btn of el.querySelectorAll('[data-del-warning]')) {
-      btn.onclick = async () => {
-        await api(`/api/admin/warnings/${btn.dataset.delWarning}`, { method: 'DELETE' })
+      $('#warn-send').onclick = async () => {
+        const userId = $('#warn-user').value
+        const message = $('#warn-message').value.trim()
+        if (!message) return banner('请填写提醒内容。')
+        const res = await api('/api/admin/warnings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId, message }) })
+        if (!res.ok) banner(((await res.json()) || {}).error || res.statusText)
         renderAdmin(el)
       }
+      observeEntrances(el)
+    } catch (err) {
+      el.innerHTML = `<p class="empty">载入失败：${esc(err.message)}</p>`
     }
   }
 
-  // ---------- boot ----------
+  // ---------- demo mode ----------
+  function demoSubmit(source) {
+    const next = { ...DEMO_TASKS[1], id: 'demo-' + Date.now().toString(36), input: { type: 'url', source: source || 'https://fixture.local/landing' }, status: 'running', result: undefined, sizeBytes: 0 }
+    state.tasks.unshift(next)
+    state.selected = next.id
+    renderTasks(); renderDetail()
+    setTimeout(() => {
+      next.status = 'done'
+      next.result = { ...DEMO_TASKS[0].result, screenshots: { '1440': 'demo/capture.jpg' }, title: 'Fixture — 新捕获' }
+      next.verifications = DEMO_TASKS[0].verifications
+      upsert(next); renderTasks(); renderDetail()
+    }, 2600)
+  }
 
+  // ---------- boot ----------
   async function loadTasks() {
+    if (DEMO) {
+      state.tasks = JSON.parse(JSON.stringify(DEMO_TASKS))
+      state.selected = state.tasks[0].id
+      $('#health').textContent = '演示数据'
+      return true
+    }
     const res = await api('/api/tasks')
     if (res.status === 401) return false
     const data = await res.json()
     state.tasks = data.tasks
     if (!state.selected || !state.tasks.some((t) => t.id === state.selected)) state.selected = state.tasks[0]?.id ?? null
-    $('#health').textContent = `队列 ${data.queue} · 任务 ${state.tasks.length}`
+    $('#health').textContent = `队列 ${data.queue}`
     return true
   }
 
   async function boot() {
+    if (DEMO) {
+      state.me = { user: { email: 'demo@kloon.dev', role: 'user', plan: 'free' }, quota: { maxTasks: 10, maxStorageBytes: 524288000, maxGenerationsPerDay: 1, maxCapturesPerDay: 20 }, totals: { tasks: 2, storageBytes: 18432000 }, usage: { capture: 3, generate: 0 }, warnings: [] }
+      $('#whoami').textContent = 'demo@kloon.dev · free'
+      $('#logout').hidden = false
+      $('#logout').onclick = () => { location.href = location.pathname }
+      $('#tab-admin').hidden = true
+      await loadTasks(); renderSidebar(); renderDetail(); revealMasked(); return
+    }
     const meRes = await api('/api/auth/me')
     if (meRes.status === 401) { state.me = null; renderAuth(); return }
     const me = await meRes.json()
     state.me = me
     $('#whoami').textContent = `${me.user.email} · ${me.user.plan}${me.user.role === 'admin' ? ' · admin' : ''}`
-    $('#logout').style.display = 'inline-block'
-    $('#tab-admin').style.display = me.user.role === 'admin' ? 'inline-block' : 'none'
+    $('#logout').hidden = false
+    $('#tab-admin').hidden = me.user.role !== 'admin'
     $('#logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); await boot() }
-    await loadTasks()
-    renderSidebar()
-    renderDetail()
-    renderWarnings()
+    banner('')
+    await loadTasks(); renderSidebar(); renderDetail(); revealMasked()
+    const warnings = (me.warnings ?? []).filter((w) => !w.acknowledged)
+    if (warnings.length) {
+      const w = warnings[0]
+      const el = $('#banner')
+      el.innerHTML = `<span>注意：${esc(w.message)}</span><button class="action ghost small" id="ack-warning">知道了</button>`
+      el.hidden = false
+      $('#ack-warning').onclick = async () => { await api(`/api/warnings/${w.id}/ack`, { method: 'POST' }); await boot() }
+    }
   }
 
   $('#tab-tasks').onclick = () => { state.view = 'tasks'; $('#tab-tasks').classList.add('active'); $('#tab-admin').classList.remove('active'); renderDetail() }
   $('#tab-admin').onclick = () => { state.view = 'admin'; $('#tab-admin').classList.add('active'); $('#tab-tasks').classList.remove('active'); renderDetail() }
 
-  const events = new EventSource('/api/events' + (tokenStore.get() ? '?token=' + encodeURIComponent(tokenStore.get()) : ''))
-  events.addEventListener('task', (ev) => {
-    const task = JSON.parse(ev.data)
-    upsert(task)
-    if (state.view === 'tasks' && state.selected === task.id) renderDetail()
-    renderTasks()
-  })
-  events.addEventListener('cleaned', () => { void loadTasks().then(() => { renderTasks(); renderDetail() }) })
+  if (!DEMO) {
+    const events = new EventSource('/api/events' + (tokenStore.get() ? '?token=' + encodeURIComponent(tokenStore.get()) : ''))
+    events.addEventListener('task', (ev) => {
+      const task = JSON.parse(ev.data)
+      upsert(task)
+      if (state.view === 'tasks' && state.selected === task.id) renderDetail()
+      renderTasks()
+    })
+    events.addEventListener('cleaned', () => { void loadTasks().then(() => { renderTasks(); renderDetail() }) })
+  }
 
-  $('#tab-tasks').classList.add('active')
-  void boot().catch((err) => banner('无法连接服务:' + err.message))
+  void boot().catch((err) => banner('无法连接服务：' + err.message))
 </script>
 </body>
 </html>

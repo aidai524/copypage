@@ -5,3 +5,4 @@ dist/
 .superpowers/
 deploy/pi-config/
 deploy/.admin-password
+.taste-skill/
