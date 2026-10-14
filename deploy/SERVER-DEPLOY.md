@@ -176,6 +176,16 @@ cd /srv/kloon && git pull            # 方式 B
 cd deploy && docker compose up -d --build
 ```
 
+> ⚠️ **改动了源文件(含 `packages/server/public/index.html`)必须 `--build`**。
+> `docker compose restart` 只是重启容器,镜像里烘焙的是构建时的源码 —— 改完前端后只 restart
+> 会出现"文件明明改了、页面还是旧的"。想改前端立即生效,可在 `docker-compose.override.yml` 里挂载:
+> ```yaml
+> services:
+>   copypage:
+>     volumes:
+>       - ../packages/server/public:/app/packages/server/public:ro
+> ```
+
 建议加一条每日备份 cron:
 ```bash
 ( crontab -l 2>/dev/null; echo '30 3 * * * cd /srv/kloon/deploy && VOL=$(docker volume ls --format "{{.Name}}" | grep copypage-data | head -1) && docker run --rm -v "$VOL":/data -v "$PWD":/backup alpine tar czf /backup/kloon-$(date +\%F).tgz -C /data .' ) | crontab -
