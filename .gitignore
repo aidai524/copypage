@@ -4,3 +4,4 @@ dist/
 .env
 .superpowers/
 deploy/pi-config/
+deploy/.admin-password
