@@ -181,7 +181,13 @@ cd deploy && docker compose up -d --build
 | 路径 | 内容 |
 |---|---|
 | `/` | 公开落地页(`packages/server/public/landing.html`) |
-| `/app` | 控制台(`packages/server/public/index.html`),邮件里的 `?verify=` / `?reset=` 也落在这里 |
+| `/app` | 控制台 · **任务列表**(默认页);邮件里的 `?verify=` / `?reset=` 也落在这里 |
+| `/app/new` | 控制台 · 新建任务表单 |
+| `/app/tasks/<id>` | 控制台 · 任务详情(进行中 / 已完成) |
+| `/app/admin` | 控制台 · 管理台(仅管理员) |
+
+> 控制台内部用 History API 路由:`/app` 与其下所有路径都由服务端返回同一份 `index.html`,
+> 由页面内的路由器决定画哪个视图。加新视图不需要改服务端。
 | `/base.css` | 两页共用的 tokens/控件/动效(**三把锁的单一来源**) |
 | `/demo/*.jpg` | 落地页与访客页展示的真实产物图 |
 
@@ -359,6 +365,40 @@ docker logs plane-app-proxy-1 --tail 5                            # 看是否在
 ```bash
 cd /srv/kloon/deploy && docker compose up -d copypage
 COPYPAGE_CHECK_URL=https://kloon.dev /srv/kloon/deploy/check.sh
+```
+
+## 附录 H:改管理员密码(只有一个真实来源)
+
+管理员密码在**三处**出现,务必一起改,否则会出现"文件里的密码登不上"的情况(本机就踩过):
+
+| 位置 | 作用 |
+|---|---|
+| `deploy/.env` 的 `COPYPAGE_ADMIN_PASSWORD` | **唯一真实来源**;容器启动时用它引导管理员(仅在账号不存在时创建) |
+| SQLite `users.password_hash` | 实际用于登录校验;启动引导**不会**覆盖它 |
+| `/root/kloon-admin-password.txt` | 给人看的副本 |
+
+改密码(用应用自己的哈希函数写库,避免格式不一致):
+
+```bash
+cd /srv/kloon/deploy
+NEW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)
+cat > /tmp/set-admin.mjs <<'EOF'
+import { DatabaseSync } from 'node:sqlite'
+import { hashPassword } from '/app/packages/server/src/auth.ts'
+const db = new DatabaseSync('/data/copypage.db')
+const r = db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE email = ?')
+  .run(hashPassword(process.env.NEWPW), new Date().toISOString(), process.env.ADMIN_EMAIL)
+console.log('rows:', r.changes)
+EOF
+docker compose cp /tmp/set-admin.mjs copypage:/tmp/set-admin.mjs
+docker compose exec -T -e NEWPW="$NEW" -e ADMIN_EMAIL="$(grep '^COPYPAGE_ADMIN_EMAIL=' .env | cut -d= -f2-)" \
+  copypage node --import tsx /tmp/set-admin.mjs
+sed -i "s|^COPYPAGE_ADMIN_PASSWORD=.*|COPYPAGE_ADMIN_PASSWORD=$NEW|" .env
+printf 'admin: %s\npassword: %s\n' "$(grep '^COPYPAGE_ADMIN_EMAIL=' .env | cut -d= -f2-)" "$NEW" > /root/kloon-admin-password.txt
+chmod 600 /root/kloon-admin-password.txt
+# 验证
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<域名>/api/auth/login \
+  -H 'content-type: application/json' -d "{\"email\":\"$(grep '^COPYPAGE_ADMIN_EMAIL=' .env | cut -d= -f2-)\",\"password\":\"$NEW\"}"
 ```
 
 ## 附录 G:`www.kloon.dev` 归一到 apex
