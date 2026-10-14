@@ -34,7 +34,8 @@ export interface RunningServer {
 
 /** Boot the capture/verify/generate service: database + worker queue + HTTP API/UI. */
 export async function startServer(opts: StartServerOptions = {}): Promise<RunningServer> {
-  const dataDir = path.resolve(opts.dataDir ?? 'work/server')
+  // --data-dir > COPYPAGE_DATA_DIR(set by the container image) > ./work/server
+  const dataDir = path.resolve(opts.dataDir ?? process.env.COPYPAGE_DATA_DIR ?? 'work/server')
   const config: ServerConfig = { ...resolveConfig(opts), dataDir }
   const publicDir = config.publicDir ?? path.join(here, '..', 'public')
   const repoRoot = path.resolve(here, '../../..')
