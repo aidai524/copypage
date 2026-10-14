@@ -138,6 +138,38 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
   const buckets = new Map<string, { tokens: number; resetAt: number }>()
 
+  /**
+   * Auth endpoints get their own, tighter bucket: `register` and `forgot-password`
+   * spend money and reputation (each hit can send a mail), and `login` is the
+   * endpoint an attacker guesses against. The general limiter is per minute and
+   * far too loose for those three.
+   */
+  const AUTH_WINDOW_MS = 10 * 60_000
+  const AUTH_LIMITS: Record<string, number> = { register: 10, forgot: 10, login: 30 }
+  const authBuckets = new Map<string, { count: number; resetAt: number }>()
+  function allowAuth(scope: 'register' | 'forgot' | 'login', req: IncomingMessage): boolean {
+    const max = AUTH_LIMITS[scope]
+    const now = Date.now()
+    if (authBuckets.size > 5_000) {
+      for (const [k, b] of authBuckets) if (now > b.resetAt) authBuckets.delete(k)
+    }
+    const key = `${scope}:${clientIp(req)}`
+    let bucket = authBuckets.get(key)
+    if (!bucket || now > bucket.resetAt) {
+      bucket = { count: 0, resetAt: now + AUTH_WINDOW_MS }
+      authBuckets.set(key, bucket)
+    }
+    bucket.count++
+    if (bucket.count <= max) return true
+    metrics.inc('copypage_auth_rate_limited_total', { scope })
+    return false
+  }
+
+  function authRateLimited(res: ServerResponse, retryAfterSeconds = 600): void {
+    res.writeHead(429, { 'content-type': 'application/json; charset=utf-8', 'retry-after': String(retryAfterSeconds) })
+    res.end(JSON.stringify({ error: 'too many attempts, try again later' }))
+  }
+
   function clientIp(req: IncomingMessage): string {
     if (config.trustProxy) {
       const xff = req.headers['x-forwarded-for']
@@ -437,6 +469,10 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     // ---------- auth ----------
 
     if (pathname === '/api/auth/register' && req.method === 'POST') {
+      if (!allowAuth('register', req)) {
+        authRateLimited(res, 600)
+        return
+      }
       if (!config.allowRegistration) {
         json(res, 403, { error: 'registration is disabled' })
         return
@@ -487,6 +523,10 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     }
 
     if (pathname === '/api/auth/login' && req.method === 'POST') {
+      if (!allowAuth('login', req)) {
+        authRateLimited(res, 600)
+        return
+      }
       let body: Record<string, unknown>
       try {
         body = (await readBody(req)) as Record<string, unknown>
@@ -548,6 +588,10 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
     }
 
     if (pathname === '/api/auth/forgot-password' && req.method === 'POST') {
+      if (!allowAuth('forgot', req)) {
+        authRateLimited(res, 600)
+        return
+      }
       let body: Record<string, unknown>
       try {
         body = (await readBody(req)) as Record<string, unknown>

@@ -85,7 +85,7 @@ describe('service security', () => {
       JSON.stringify({ name: 'evil', scripts: { build: 'touch /tmp/pwned' } }),
     )
     await writeFile(path.join(reproDir, 'index.html'), '<html></html>')
-    server = await startServer({ port: 0, dataDir, token: 'secret-test' })
+    server = await startServer({ port: 0, dataDir, token: 'secret-test', allowRegistration: true })
   }, 60_000)
 
   afterAll(async () => {
@@ -105,6 +105,27 @@ describe('service security', () => {
     expect(ok.status).toBe(200)
     const viaQuery = await fetch(`${server.url}/api/tasks?token=secret-test`)
     expect(viaQuery.status).toBe(200)
+  })
+
+  it('rate limits the auth endpoints that can send mail', async () => {
+    const post = (path: string, body: unknown) =>
+      fetch(`${server.url}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    // registration allows 10 attempts per 10 minutes from one address
+    for (let i = 0; i < 10; i++) {
+      const res = await post('/api/auth/register', { email: `burst-${i}@security.test`, password: 'burstpass123' })
+      expect(res.status, `attempt ${i + 1}`).toBe(201)
+    }
+    const blocked = await post('/api/auth/register', { email: 'burst-final@security.test', password: 'burstpass123' })
+    expect(blocked.status).toBe(429)
+    expect(blocked.headers.get('retry-after')).toBeTruthy()
+
+    // and the same guard covers password reset mail
+    const forgot = await post('/api/auth/forgot-password', { email: 'nobody@security.test' })
+    expect([200, 202, 404]).toContain(forgot.status)
   })
 
   it('rejects SSRF targets by default', async () => {

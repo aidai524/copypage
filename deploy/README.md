@@ -15,7 +15,7 @@
 
 - 地址 `http://127.0.0.1:4400`(默认只听本机;远程访问用 SSH 隧道或改 `--host`)
 - 日志:`journalctl --user -u copypage -f`(含请求日志、任务进度)
-- 令牌:`deploy/.env` 中的 `COPYPAGE_TOKEN`,UI 右上角填入
+- 令牌:`deploy/.env` 中的 `COPYPAGE_TOKEN`,只给 API/巡检/监控用;界面走邮箱密码登录,不再使用令牌
 - 停止/卸载:`systemctl --user disable --now copypage`
 - 重启后仍运行:登录会话内有效;需要登出后继续运行则 `loginctl enable-linger $USER`
 

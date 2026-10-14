@@ -193,15 +193,9 @@ main { padding: 0 var(--margin); }
     ['localhost', '127.0.0.1', '::1'].includes(location.hostname)
 
   const state = { me: null, tasks: [], selected: null, view: 'tasks' }
-  const tokenStore = {
-    get() { return DEMO ? '' : localStorage.getItem('copypage-token') || '' },
-    set(v) { DEMO ? null : (v ? localStorage.setItem('copypage-token', v) : localStorage.removeItem('copypage-token')) },
-  }
+  // sessions live in an httpOnly cookie: the console never handles a token
   function api(path, init = {}) {
-    const headers = { ...(init.headers || {}) }
-    const token = tokenStore.get()
-    if (token) headers.authorization = 'Bearer ' + token
-    return fetch(path, { credentials: 'same-origin', ...init, headers })
+    return fetch(path, { credentials: 'same-origin', ...init, headers: { ...(init.headers || {}) } })
   }
   function banner(msg) {
     const el = $('#banner')
@@ -311,6 +305,7 @@ main { padding: 0 var(--margin); }
           <input type="password" id="login-password" autocomplete="current-password" required minlength="8" />
           <button class="action" type="submit">登录</button>
           <button class="swap" type="button" id="show-register">没有账号？注册</button>
+          <button class="swap" type="button" id="show-forgot">忘记密码？</button>
         </form>
 
         <form id="register-form" hidden>
@@ -329,14 +324,12 @@ main { padding: 0 var(--margin); }
           <button class="swap" type="button" id="reset-cancel">返回登录</button>
         </form>
 
-        <details id="token-details" class="enter">
-          <summary>私有部署：使用访问令牌</summary>
-          <form id="token-form">
-            <label for="token">访问令牌</label>
-            <input type="password" id="token" placeholder="COPYPAGE_TOKEN" />
-            <button class="action ghost" type="button" id="token-save">使用令牌</button>
-          </form>
-        </details>
+        <form id="forgot-form" hidden>
+          <label for="forgot-email">注册邮箱</label>
+          <input type="email" id="forgot-email" autocomplete="username" required />
+          <button class="action" type="submit">发送重置链接</button>
+          <button class="swap" type="button" id="forgot-cancel">返回登录</button>
+        </form>
 
         <div id="auth-notice"></div>
       </div>`
@@ -380,6 +373,7 @@ main { padding: 0 var(--margin); }
       $('#login-form').hidden = which !== 'login'
       $('#register-form').hidden = which !== 'register'
       $('#reset-form').hidden = which !== 'reset'
+      $('#forgot-form').hidden = which !== 'forgot'
     }
 
     const post = async (path, body, btn) => {
@@ -394,12 +388,21 @@ main { padding: 0 var(--margin); }
 
     $('#show-register').onclick = () => { notice(''); show('register') }
     $('#show-login').onclick = () => { notice(''); show('login') }
+    $('#show-forgot').onclick = () => { notice(''); show('forgot') }
+    $('#forgot-cancel').onclick = () => { notice(''); show('login') }
+    $('#forgot-form').onsubmit = async (e) => {
+      e.preventDefault()
+      const btn = e.target.querySelector('button[type=submit]')
+      btn.disabled = true
+      try {
+        await api('/api/auth/forgot-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('#forgot-email').value }) })
+        notice('如果这个邮箱已注册，重置链接已经发出。')
+        show('login')
+      } catch (err) { notice(err.message, true) } finally { btn.disabled = false }
+    }
     $('#reset-cancel').onclick = () => { notice(''); history.replaceState(null, '', '/app'); show('login') }
     $('#login-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/login', { email: $('#login-email').value, password: $('#login-password').value }, e.target.querySelector('button[type=submit]')) }
     $('#register-form').onsubmit = (e) => { e.preventDefault(); void post('/api/auth/register', { email: $('#reg-email').value, password: $('#reg-password').value }, e.target.querySelector('button[type=submit]')) }
-    $('#token-save').onclick = () => { tokenStore.set($('#token').value.trim()); location.reload() }
-    $('#token').value = tokenStore.get()
-
     // links that arrive from email: ?verify=<token> and ?reset=<token>
     const params = new URLSearchParams(location.search)
     const verifyToken = params.get('verify')
@@ -935,7 +938,7 @@ main { padding: 0 var(--margin); }
   let events = null
   function openStream() {
     if (DEMO || events) return
-    const url = '/api/events' + (tokenStore.get() ? '?token=' + encodeURIComponent(tokenStore.get()) : '')
+    const url = '/api/events'
     events = new EventSource(url)
     events.addEventListener('task', (ev) => {
       const task = JSON.parse(ev.data)

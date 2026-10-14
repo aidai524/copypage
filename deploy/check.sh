@@ -86,4 +86,4 @@ if [[ $fail -gt 0 ]]; then
   echo "先修复 ❌ 项再继续。完整说明见 deploy/README.md"
   exit 1
 fi
-echo "可以开始:$BASE 打开界面,右上角填令牌"
+echo "可以开始:$BASE/app 注册或登录(令牌只给 API 与巡检用)"

@@ -63,7 +63,7 @@ git clone -b loved-hound https://<用户名>:<PAT>@github.com/aidai524/copypage.
 cd /srv/kloon/deploy
 cp .env.example .env
 
-# 必填:访问令牌(自己保存好,UI 登录/API 都用它)
+# 必填:访问令牌(自己保存好,API/巡检/监控用;界面用邮箱密码登录)
 TOKEN=$(openssl rand -hex 32)
 sed -i "s|^COPYPAGE_TOKEN=.*|COPYPAGE_TOKEN=$TOKEN|" .env
 
