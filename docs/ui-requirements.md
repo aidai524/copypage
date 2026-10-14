@@ -191,6 +191,7 @@
 
 ### 9.6 仍未做(与 §8 一致)
 
-- 公开注册默认关闭(`COPYPAGE_ALLOW_REGISTRATION=true` 才开),落地页已用一句话说明"注册需管理员开通"。
+- ~~公开注册默认关闭~~ → **已开放**(`COPYPAGE_ALLOW_REGISTRATION=true`,2026-10-14);界面不再要求访问令牌(令牌只给 API/巡检/监控),
+  登录页改用"忘记密码"入口;注册/登录/找回密码各有独立限流(10/30/10 每 10 分钟每 IP)。
 - `www.kloon.dev` 记录 + Caddy `www` 块。
 - kloon.dev 专属 Resend sending key(现与其它域共用)。

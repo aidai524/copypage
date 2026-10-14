@@ -188,6 +188,17 @@ cd deploy && docker compose up -d --build
 > 改配色/圆角/字体/控件只改 `packages/server/public/base.css` 一处,两个页面同时生效。
 > 改 `.html` 或 `.css` 都属于源文件改动 —— 仍然必须 `--build`。
 
+### 上线后常见的三个困惑(都踩过)
+
+1. **"我改了页面,浏览器还是旧的"** —— 静态资源现在带 `ETag` + `cache-control: no-cache`,浏览器每次都会回来校验(命中就 304,几乎不耗流量)。
+   改版发布后如果仍看到旧界面,让用户强刷一次(`Ctrl+Shift+R`)即可;之前没有缓存头,浏览器会按启发式缓存**一直**用旧副本,
+   而控制台是单文件(HTML 内联 JS),旧的会把旧界面整套显示出来。
+2. **"界面要填令牌?"** —— 不需要。界面走邮箱密码登录;`COPYPAGE_TOKEN` 只给 API、巡检脚本和 /metrics 用。
+3. **"注册开了会不会被刷邮件"** —— `COPYPAGE_ALLOW_REGISTRATION=true` 之后,`/api/auth/register`、`/api/auth/login`、
+   `/api/auth/forgot-password` 有独立限流(10 / 30 / 10 次每 10 分钟每 IP,超出返回 429 + `retry-after`),
+   命中次数看指标 `copypage_auth_rate_limited_total`。另外 `COPYPAGE_REQUIRE_EMAIL_VERIFICATION=true`
+   保证未验证邮箱不能提交任务。
+
 > ⚠️ **改动了源文件(含 `packages/server/public/index.html`)必须 `--build`**。
 > `docker compose restart` 只是重启容器,镜像里烘焙的是构建时的源码 —— 改完前端后只 restart
 > 会出现"文件明明改了、页面还是旧的"。想改前端立即生效,可在 `docker-compose.override.yml` 里挂载:
