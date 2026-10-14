@@ -273,6 +273,57 @@ COPYPAGE_TRUST_PROXY=true                # 前置负载均衡
 ```
 每台机器跑同一份服务即可;任务队列在 Postgres 里原子认领,不会重复执行。验证:`COPYPAGE_TEST_DATABASE_URL=postgres://… npm test`。
 
+## 附录 F:服务器已有反代占用 80/443(本机就是这种情况)
+
+判断方法:
+```bash
+ss -tlnp | grep -E ':(80|443)\s'          # 或
+docker ps --format '{{.Names}}\t{{.Ports}}' | grep -E '0.0.0.0:(80|443)'
+```
+本服务器跑着自建 Plane(`plane-app-proxy-1` 是 Caddy,占 80/443,站点 `team.stableflow.ai`),
+所以 **Kloon 不启动自带 Caddy**,改为挂在既有边缘上:
+
+**1) 应用只发布到 docker 桥网关(非公网)**,在 `deploy/` 下建 `docker-compose.override.yml`:
+```yaml
+services:
+  copypage:
+    ports:
+      - "172.18.0.1:8081:4400"    # 172.18.0.1 = ${NETWORK} 的网关;只绑网关,公网不可达
+```
+```bash
+docker compose rm -sf caddy          # 不再需要自带 caddy
+docker compose up -d copypage
+curl -s http://172.18.0.1:8081/api/health          # 宿主自检
+docker exec <既有反代容器> curl -s http://172.18.0.1:8081/api/health   # 边缘容器可达性
+```
+网关 IP 获取:`docker network inspect <plane-app_default> --format '{{(index .IPAM.Config 0).Gateway}}'`
+
+**2) 在既有 Caddyfile 追加站点块**(先备份、校验、热重载,避免影响现有站点):
+```bash
+cd /root/plane-selfhost/plane-app
+cp Caddyfile.ai "Caddyfile.ai.bak-$(date +%Y%m%d-%H%M%S)"
+cat >> Caddyfile.ai <<'EOF'
+
+kloon.dev {
+	encode zstd gzip
+	reverse_proxy 172.18.0.1:8081 { flush_interval -1 }
+}
+EOF
+docker exec plane-app-proxy-1 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker exec plane-app-proxy-1 caddy reload   --config /etc/caddy/Caddyfile --adapter caddyfile
+curl -s -o /dev/null -w '%{http_code}\n' -k https://<既有站点>   # 确认没影响
+docker logs plane-app-proxy-1 --tail 5                            # 看是否在申请 kloon.dev 证书
+```
+> DNS 未生效时日志会出现 `no valid A records found for kloon.dev` —— 这是预期的,Caddy 会自动重试;
+> A 记录一生效,HTTPS 证书自动签发,无需再改配置。
+
+**3) DNS 生效后**:把 `.env` 的 `COPYPAGE_APP_URL` 改成 `https://kloon.dev`(邮件链接),
+`SITE_ADDRESS=kloon.dev`(若将来自己接管 80/443 时用),然后:
+```bash
+cd /srv/kloon/deploy && docker compose up -d copypage
+COPYPAGE_CHECK_URL=https://kloon.dev /srv/kloon/deploy/check.sh
+```
+
 ## 附录 E:在 Docker 部署里开启容器沙箱(可选,较复杂)
 
 Compose 默认是**进程级隔离**。要「每个任务一个容器」需要:镜像内加 docker CLI、挂载宿主 socket、且宿主已构建 worker 镜像。
