@@ -344,10 +344,14 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
     // static UI assets: / is the public landing page, /app the console,
     // everything else under the public dir
-    if (!pathname.startsWith('/api/') && req.method === 'GET' && pathname !== '/metrics') {
+    if (
+      !pathname.startsWith('/api/') &&
+      (req.method === 'GET' || req.method === 'HEAD') &&
+      pathname !== '/metrics'
+    ) {
       const rel =
         pathname === '/' ? 'landing.html' : pathname === '/app' ? 'index.html' : decodeURIComponent(pathname.slice(1))
-      await serveFile(res, publicDir, rel)
+      await serveFile(req, res, publicDir, rel)
       return
     }
 
@@ -845,7 +849,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 404, { error: 'unknown task' })
         return
       }
-      await serveFile(res, store.taskDir(files[1]), decodeURIComponent(files[2]))
+      await serveFile(req, res, store.taskDir(files[1]), decodeURIComponent(files[2]))
       return
     }
 
@@ -856,7 +860,7 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
         json(res, 404, { error: 'unknown task' })
         return
       }
-      await serveFile(res, store.snapshotDir(artifacts[1]), decodeURIComponent(artifacts[2]))
+      await serveFile(req, res, store.snapshotDir(artifacts[1]), decodeURIComponent(artifacts[2]))
       return
     }
 
@@ -1096,7 +1100,12 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
 
   // ---------- files ----------
 
-  async function serveFile(res: ServerResponse, root: string, rel: string): Promise<void> {
+  async function serveFile(
+    req: IncomingMessage,
+    res: ServerResponse,
+    root: string,
+    rel: string,
+  ): Promise<void> {
     const resolvedRoot = path.resolve(root)
     const full = path.resolve(resolvedRoot, rel)
     if (full !== resolvedRoot && !full.startsWith(resolvedRoot + path.sep)) {
@@ -1108,10 +1117,26 @@ export function createApiServer({ store, queue, db, config, publicDir, authRequi
       json(res, 404, { error: 'file not found' })
       return
     }
+    // no-cache = "store it, but revalidate every time". Without it browsers apply
+    // heuristic caching and keep serving an old UI after a deploy (the whole app is
+    // one HTML file with inline script, so a stale copy shows the previous console).
+    const etag = `W/"${info.size.toString(16)}-${Math.floor(info.mtimeMs).toString(16)}"`
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, { etag, 'cache-control': 'no-cache' })
+      res.end()
+      return
+    }
     res.writeHead(200, {
       'content-type': MIME[path.extname(full).toLowerCase()] ?? 'application/octet-stream',
       'content-length': info.size,
+      etag,
+      'cache-control': 'no-cache',
+      'last-modified': info.mtime.toUTCString(),
     })
+    if (req.method === 'HEAD') {
+      res.end()
+      return
+    }
     res.end(await readFile(full))
   }
 

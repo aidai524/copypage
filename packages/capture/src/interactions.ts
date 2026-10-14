@@ -19,8 +19,15 @@ const CLICK_WAIT_MS = 700
  * Catches tab widgets, accordions, carousels — things static captures miss.
  */
 export async function discoverInteractions(page: Page): Promise<InteractionFinding[]> {
-  // install observer + candidate collector
-  await page.evaluate(`(() => {
+  // The state pass clicks real elements, so a click may have followed a link: the
+  // document can be mid-navigation here, where document.body does not exist yet.
+  // Wait briefly, then treat "no body" as "nothing to discover" rather than
+  // failing the whole capture over an optional enrichment step.
+  await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
+  const installed = (await page
+    .evaluate(`(() => {
+    const target = document.body || document.documentElement
+    if (!target) return false
     window.__cpMuts = []
     window.__cpObserver = new MutationObserver((ms) => {
       for (const m of ms) {
@@ -33,8 +40,11 @@ export async function discoverInteractions(page: Page): Promise<InteractionFindi
         })
       }
     })
-    window.__cpObserver.observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true })
+    window.__cpObserver.observe(target, { childList: true, subtree: true, attributes: true, characterData: true })
+    return true
   })()`)
+    .catch(() => false)) as boolean
+  if (!installed) return []
 
   const candidates: { selector: string; text: string }[] = await page.evaluate(`(() => {
     const els = Array.from(document.querySelectorAll(
@@ -56,7 +66,7 @@ export async function discoverInteractions(page: Page): Promise<InteractionFindi
 
   // text snapshot helper (visible text of body)
   const textSnapshot = () =>
-    page.evaluate(`document.body.innerText`) as Promise<string>
+    page.evaluate(`document.body ? document.body.innerText : ''`) as Promise<string>
 
   const findings: InteractionFinding[] = []
 

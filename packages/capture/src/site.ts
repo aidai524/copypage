@@ -13,6 +13,10 @@ import { detectAdaptive } from './adaptive.js'
 import { dismissOverlays, type Dismissal } from './dismiss.js'
 import { chromiumArgs } from './browser.js'
 
+function firstLine(err: unknown): string {
+  return String((err as Error)?.message ?? err).split('\n')[0]
+}
+
 export interface CaptureSiteOptions {
   viewports?: number[]
   /** page height for each viewport; defaults to 900 */
@@ -148,10 +152,14 @@ export async function captureSite(
       const assets = await downloadAssets(page, outDir, { budgetMs: opts.assetsBudgetMs })
       log(`assets: ${assets.files.length} ok, ${assets.failed.length} failed`)
       if (opts.states !== false) {
-        // reopen the data gate so hover/click captures can trigger app behavior
-        await unfreezeDynamic(page)
-        await captureStates(page, outDir)
-        log('states: done')
+        try {
+          // reopen the data gate so hover/click captures can trigger app behavior
+          await unfreezeDynamic(page)
+          await captureStates(page, outDir)
+          log('states: done')
+        } catch (err) {
+          log(`states: skipped (${firstLine(err)})`)
+        }
       }
       const charts = await detectCharts(page)
       log(`charts: ${charts.length} found`)
@@ -161,11 +169,15 @@ export async function captureSite(
       }
       if (opts.states !== false) {
         // interaction discovery runs LAST: clicks may leave the page in a changed state
-        const interactions = await discoverInteractions(page)
-        if (interactions.length > 0) {
-          await writeFile(path.join(outDir, 'interactions.json'), JSON.stringify(interactions, null, 2))
+        try {
+          const interactions = await discoverInteractions(page)
+          if (interactions.length > 0) {
+            await writeFile(path.join(outDir, 'interactions.json'), JSON.stringify(interactions, null, 2))
+          }
+          log(`interactions: ${interactions.length} clickable triggers found`)
+        } catch (err) {
+          log(`interactions: skipped (${firstLine(err)})`)
         }
-        log(`interactions: ${interactions.length} clickable triggers found`)
       }
       if (assets.failed.length > 0) {
         await writeFile(

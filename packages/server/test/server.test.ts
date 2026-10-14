@@ -79,6 +79,22 @@ describe('capture service', () => {
     expect(await shared.text()).toContain('--accent: #4ade80')
   })
 
+  it('serves the UI with a revalidating cache and answers HEAD', async () => {
+    // without cache-control a browser applies heuristic caching and keeps showing the
+    // previous console after a deploy, because the whole app is one cached HTML file
+    const head = await fetch(`${server.url}/app`, { method: 'HEAD' })
+    expect(head.status).toBe(200)
+    expect(head.headers.get('cache-control')).toBe('no-cache')
+    const etag = head.headers.get('etag')
+    expect(etag, 'etag present on static assets').toBeTruthy()
+
+    const revalidated = await fetch(`${server.url}/app`, { headers: { 'if-none-match': etag! } })
+    expect(revalidated.status).toBe(304)
+
+    const changed = await fetch(`${server.url}/base.css`, { headers: { 'if-none-match': '"stale"' } })
+    expect(changed.status).toBe(200)
+  })
+
   it('rejects invalid task input', async () => {
     const res = await fetch(`${server.url}/api/tasks`, {
       method: 'POST',
