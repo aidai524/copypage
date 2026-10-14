@@ -107,6 +107,10 @@ echo "管理员密码已存到 /root/kloon-admin-password.txt"
 cd /srv/kloon/deploy
 docker compose up -d --build      # 首次:拉 Playwright 基础镜像 + npm ci,约 5~15 分钟
 docker compose ps                 # copypage 状态应为 healthy
+
+# 自带 Caddy 在 profile "edge" 里,默认不启动(避免与机器上已有反代抢 80/443)。
+# 只有服务器的 80/443 空闲、想让本栈自己终结 TLS 时才需要:
+# docker compose --profile edge up -d
 ```
 
 ---
