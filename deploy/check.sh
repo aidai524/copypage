@@ -14,6 +14,9 @@ echo "== 1. 配置文件 =="
 if [[ ! -f "$ENV_FILE" ]]; then
   bad "缺少 $ENV_FILE(先 cp deploy/.env.example deploy/.env)"
 else
+  if ! bash -n "$ENV_FILE" 2>/tmp/copypage-env-error; then
+    bad "$ENV_FILE 语法错误(值里有空格/尖括号时要用引号): $(head -1 /tmp/copypage-env-error)"
+  fi
   # shellcheck disable=SC1090
   set -a; source "$ENV_FILE"; set +a
   pass "已加载 $ENV_FILE"

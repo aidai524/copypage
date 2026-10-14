@@ -41,7 +41,7 @@ export async function writeReport(
     </tr>`).join('\n')
 
   const html = `<!doctype html>
-<html><head><meta charset="utf-8"><title>CopyPage Report</title>
+<html><head><meta charset="utf-8"><title>Kloon 还原报告</title>
 <style>
   body { font-family: -apple-system, sans-serif; margin: 32px; color: #1a1a2e; }
   .metrics { display: flex; gap: 24px; margin-bottom: 24px; }
@@ -59,7 +59,7 @@ export async function writeReport(
   .legend { color: #6b7280; font-size: 12px; }
 </style></head>
 <body>
-  <h1>CopyPage 还原报告</h1>
+  <h1>Kloon 还原报告</h1>
   <div class="metrics">
     <div class="metric">SSIM<br><b>${result.metrics.ssim}</b></div>
     <div class="metric">像素差异<br><b>${result.metrics.pixelDiffPct}%</b></div>

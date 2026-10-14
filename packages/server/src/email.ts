@@ -69,7 +69,7 @@ function layout(opts: { title: string; intro: string; cta?: { label: string; url
     <h2 style="margin:0 0 12px">${opts.title}</h2>
     <p style="margin:0 0 8px">${opts.intro}</p>
     ${cta}
-    <p style="color:#71717a;font-size:12px;margin-top:24px">${opts.footer ?? 'CopyPage — 网站一比一还原工具'}</p>
+    <p style="color:#71717a;font-size:12px;margin-top:24px">${opts.footer ?? 'Kloon — 网站一比一还原工具'}</p>
   </div>`
   const text = [opts.title, '', opts.intro, ...(opts.cta ? ['', `${opts.cta.label}: ${opts.cta.url}`] : [])].join('\n')
   return { html, text }
@@ -82,7 +82,7 @@ export function verificationEmail(config: ServerConfig, to: string, token: strin
     intro: '点击下面的按钮完成邮箱验证,之后即可提交捕获/验证/生成任务。链接 24 小时内有效。',
     cta: { label: '验证邮箱', url },
   })
-  return { to, subject: 'CopyPage 邮箱验证', ...rendered }
+  return { to, subject: 'Kloon 邮箱验证', ...rendered }
 }
 
 export function resetEmail(config: ServerConfig, to: string, token: string): EmailMessage {
@@ -92,23 +92,23 @@ export function resetEmail(config: ServerConfig, to: string, token: string): Ema
     intro: '点击下面的按钮设置新密码。链接 1 小时内有效;如果不是你本人操作,请忽略本邮件。',
     cta: { label: '设置新密码', url },
   })
-  return { to, subject: 'CopyPage 密码重置', ...rendered }
+  return { to, subject: 'Kloon 密码重置', ...rendered }
 }
 
 export function warningEmail(to: string, message: string): EmailMessage {
   const rendered = layout({
     title: '账户提醒',
     intro: message,
-    footer: 'CopyPage — 如有疑问请回复本邮件联系管理员',
+    footer: 'Kloon — 如有疑问请回复本邮件联系管理员',
   })
-  return { to, subject: '[CopyPage] 账户提醒', ...rendered }
+  return { to, subject: '[Kloon] 账户提醒', ...rendered }
 }
 
 export function alertEmail(to: string, title: string, lines: string[]): EmailMessage {
   const rendered = layout({
     title,
     intro: lines.map((l) => `<span>${l}</span>`).join('<br>'),
-    footer: 'CopyPage 运维告警',
+    footer: 'Kloon 运维告警',
   })
-  return { to, subject: `[CopyPage 告警] ${title}`, ...rendered }
+  return { to, subject: `[Kloon 告警] ${title}`, ...rendered }
 }

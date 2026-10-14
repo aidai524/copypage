@@ -65,7 +65,7 @@ const server = await startServer({
   ...(agentModel ? { agentModel } : {}),
 })
 
-console.log(`CopyPage capture service → ${server.url}`)
+console.log(`Kloon capture service → ${server.url}`)
 console.log(`  data dir: ${dataDir}`)
 console.log(`  auth: ${token ? 'bearer token required' : 'OPEN (loopback only)'}`)
 console.log(`  retention: ${retentionHours}h · max tasks: ${maxTasks} · max upload: ${maxUploadMb}MB`)

@@ -47,8 +47,9 @@ describe(`PgDb (${URL ? 'server' : 'embedded PGlite'})`, () => {
   }, 60_000)
 
   afterAll(async () => {
+    // without a real server, `other` is the same embedded instance
+    if (other && other !== db) await other.close()
     await db?.close()
-    await other?.close()
   })
 
   it('round-trips users, sessions and usage counters', async () => {

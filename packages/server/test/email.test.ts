@@ -85,7 +85,7 @@ describe('email flows (Resend)', () => {
     const mail = resend.emails[0]
     expect(mail.to).toEqual(['mail-user@email.test'])
     expect(mail.subject).toContain('邮箱验证')
-    expect(mail.from).toContain('CopyPage')
+    expect(mail.from).toContain('Kloon')
 
     // job routes are blocked until the address is verified
     const blocked = await fetch(`${server.url}/api/tasks`, { headers: { cookie } })

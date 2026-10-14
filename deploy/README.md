@@ -54,6 +54,32 @@ COPYPAGE_CHECK_URL=https://your.domain ./deploy/check.sh   # 检查远端
 
 输出 `✅/⚠️/❌` 清单,有 ❌ 会以非零码退出。首次部署建议按它逐项消掉。
 
+## 域名上线清单(kloon.dev)
+
+1. **注册域名**:`kloon.dev`(以及顺手把 `kloon.app`/`copypage.app` 等防护性注册,按预算)
+2. **DNS 指向部署机**:
+   ```
+   A     kloon.dev        → <服务器公网 IP>
+   AAAA  kloon.dev        → <服务器 IPv6>(可选)
+   A     www.kloon.dev    → <服务器公网 IP>(可选,后续在 Caddyfile 里加站点)
+   ```
+   放行 80/443(80 用于证书签发跳转)
+3. **`.env` 里填域名**(已默认):
+   ```ini
+   SITE_ADDRESS=kloon.dev
+   COPYPAGE_APP_URL=https://kloon.dev
+   COPYPAGE_EMAIL_FROM="Kloon <no-reply@kloon.dev>"
+   ```
+   注意含空格/尖括号的值**必须加引号**,否则 systemd/shell 解析会报语法错误(`check.sh` 会提前拦下)
+4. **HTTPS**:Docker Compose 方式由 Caddy 自动申请 Let's Encrypt 证书;systemd 方式需要宿主机自己的反代(nginx/caddy)或改用 compose
+5. **Resend 验证 `kloon.dev`**:Resend → Domains → 添加 `kloon.dev` → 按提示加 SPF/DKIM TXT 记录 → Verified 后把 `COPYPAGE_RESEND_API_KEY` 填上
+6. **验收**:
+   ```bash
+   COPYPAGE_CHECK_URL=https://kloon.dev ./deploy/check.sh   # 远端自检
+   curl -sI https://kloon.dev | head -3                      # 证书与跳转
+   ```
+   然后用 `@your-domain` 的邮箱注册一次,确认验证邮件能收到、链接指向 `https://kloon.dev`
+
 ## 1. 准备
 
 前置:把用户加入 docker 组(需重新登录生效):

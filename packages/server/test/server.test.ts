@@ -153,7 +153,7 @@ describe('capture service', () => {
     expect(report.status).toBe(200)
     expect(report.headers.get('content-type')).toContain('text/html')
     const html = await report.text()
-    expect(html).toContain('CopyPage 还原报告')
+    expect(html).toContain('Kloon 还原报告')
     expect(html).toContain('../../orig/screenshots/')
 
     const heat = await fetch(

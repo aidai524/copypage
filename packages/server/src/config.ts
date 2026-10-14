@@ -159,7 +159,7 @@ export function resolveConfig(partial: Partial<ServerConfig> = {}): ServerConfig
     workerMemoryMb: partial.workerMemoryMb ?? Number(process.env.COPYPAGE_WORKER_MEMORY_MB ?? '3072'),
     plans: partial.plans ?? DEFAULT_PLANS,
     resendBaseUrl: partial.resendBaseUrl ?? process.env.COPYPAGE_RESEND_BASE_URL ?? 'https://api.resend.com',
-    emailFrom: partial.emailFrom ?? process.env.COPYPAGE_EMAIL_FROM ?? 'CopyPage <onboarding@resend.dev>',
+    emailFrom: partial.emailFrom ?? process.env.COPYPAGE_EMAIL_FROM ?? 'Kloon <onboarding@resend.dev>',
     appUrl: (partial.appUrl ?? process.env.COPYPAGE_APP_URL ?? 'http://localhost:4400').replace(/\/$/, ''),
     requireEmailVerification:
       partial.requireEmailVerification ?? envBool('COPYPAGE_REQUIRE_EMAIL_VERIFICATION', false),
