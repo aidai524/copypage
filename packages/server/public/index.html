@@ -572,7 +572,10 @@ main { padding: 0 var(--margin); }
   function sync(opts = {}) {
     if (!state.me) return // the auth screen owns the page until there is a session
     const r = currentRoute()
-    const fresh = r.name !== view.name || r.id !== view.id
+    // routes without an id (list, new, admin) carry undefined; view stores null.
+    // Comparing them raw made every poll look like a route change and repaint the
+    // page, which wiped whatever was typed into /app/new.
+    const fresh = r.name !== view.name || (r.id ?? null) !== view.id
     if (fresh || opts.force) {
       view.name = r.name
       view.id = r.id ?? null
