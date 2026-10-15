@@ -6,3 +6,5 @@ dist/
 deploy/pi-config/
 deploy/.admin-password
 .taste-skill/
+.mise.local.toml
+mise.local.toml
