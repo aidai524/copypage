@@ -1169,7 +1169,7 @@ main { padding: 0 var(--margin); }
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || res.statusText)
         upsert(data.task)
-        await refresh(true)
+        await refresh()
       } catch (err) { banner(err.message) } finally { btn.disabled = false }
     }
   }
@@ -1193,7 +1193,7 @@ main { padding: 0 var(--margin); }
       const source = pathInput.value.trim()
       if (!source) return banner('请先填写还原工程目录。')
       pathBtn.disabled = true
-      try { const data = await post(JSON.stringify({ repro: { type: 'path', source } })); upsert(data.task); await refresh(true) }
+      try { const data = await post(JSON.stringify({ repro: { type: 'path', source } })); upsert(data.task); await refresh() }
       catch (err) { banner(err.message) } finally { pathBtn.disabled = false }
     }
     zipBtn.onclick = () => zipInput.click()
@@ -1201,7 +1201,7 @@ main { padding: 0 var(--margin); }
       const file = zipInput.files?.[0]
       if (!file) return
       zipBtn.disabled = true
-      try { const data = await post(file, { 'content-type': 'application/zip', 'x-filename': file.name }); upsert(data.task); await refresh(true) }
+      try { const data = await post(file, { 'content-type': 'application/zip', 'x-filename': file.name }); upsert(data.task); await refresh() }
       catch (err) { banner(err.message) } finally { zipBtn.disabled = false; zipInput.value = '' }
     }
   }
@@ -1402,7 +1402,7 @@ main { padding: 0 var(--margin); }
       const el = $('#banner')
       el.innerHTML = `<span>注意：${esc(w.message)}</span><button class="action ghost small" id="ack-warning">知道了</button>`
       el.hidden = false
-      $('#ack-warning').onclick = async () => { await api(`/api/warnings/${w.id}/ack`, { method: 'POST' }); banner(''); await refresh(true) }
+      $('#ack-warning').onclick = async () => { await api(`/api/warnings/${w.id}/ack`, { method: 'POST' }); banner(''); await refresh() }
     }
   }
 
