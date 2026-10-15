@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>豆舍 · 每周现烘咖啡豆(虚构示例页)</title>
+<style>
+  /* Original example page for the Kloon demo. Fictional brand, no third-party assets.
+     "#repro" switches on a hand-made reproduction that is close but not identical. */
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, -apple-system, "PingFang SC", "Noto Sans SC", sans-serif; background: #faf6ef; color: #2b2118; width: 100%; }
+  header { height: 80px; padding: 0 64px; display: flex; align-items: center; gap: 40px; }
+  .logo { font-size: 24px; font-weight: 700; letter-spacing: 0.02em; }
+  nav { display: flex; gap: 28px; margin-left: auto; font-size: 16px; color: #6b5a49; }
+  .pill { padding: 10px 22px; border-radius: 999px; background: #2b2118; color: #faf6ef; font-size: 15px; font-weight: 600; }
+  .hero { height: 520px; padding: 0 64px; display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 48px; }
+  .tag { display: inline-block; padding: 6px 14px; border-radius: 6px; background: #f1e3cc; color: #8a5a1f; font-size: 14px; font-weight: 600; }
+  h1 { margin-top: 20px; font-size: 64px; line-height: 1.12; font-weight: 800; letter-spacing: -0.03em; }
+  .lead { margin-top: 20px; font-size: 19px; line-height: 1.6; color: #6b5a49; max-width: 30em; }
+  .actions { margin-top: 32px; display: flex; gap: 16px; align-items: center; }
+  .btn { padding: 16px 32px; border-radius: 14px; background: #c8622b; color: #fff; font-size: 17px; font-weight: 700; box-shadow: 0 8px 20px rgba(200, 98, 43, 0.35); }
+  .ghost { font-size: 17px; font-weight: 600; color: #2b2118; }
+  .art { height: 420px; border-radius: 28px; background: #efe0c8; display: grid; place-items: center; }
+  .stats { margin: 0 64px; height: 120px; border-top: 1px solid #e2d3bb; border-bottom: 1px solid #e2d3bb; display: grid; grid-template-columns: repeat(3, 1fr); align-items: center; text-align: center; }
+  .stats b { display: block; font-size: 40px; font-weight: 800; color: #c8622b; }
+  .stats span { font-size: 15px; color: #6b5a49; }
+  .products { padding: 72px 64px 0; height: 520px; }
+  h2 { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; }
+  .grid { margin-top: 32px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .card { height: 320px; padding: 20px; border-radius: 20px; background: #fff; border: 1px solid #eadfcd; display: grid; grid-template-rows: 150px auto 1fr; gap: 12px; }
+  .swatch { border-radius: 12px; }
+  .card h3 { font-size: 20px; }
+  .card p { font-size: 15px; line-height: 1.5; color: #6b5a49; }
+  .row { display: flex; justify-content: space-between; align-items: center; align-self: end; }
+  .price { font-size: 22px; font-weight: 700; }
+  .add { padding: 8px 18px; border-radius: 8px; background: #2b2118; color: #faf6ef; font-size: 14px; font-weight: 600; }
+  footer { height: 120px; padding: 0 64px; display: flex; align-items: center; justify-content: space-between; background: #2b2118; color: #d9c9b0; font-size: 15px; }
+  @media (max-width: 900px) {
+    header { padding: 0 32px; } nav { display: none; }
+    .hero { height: auto; padding: 40px 32px; grid-template-columns: 1fr; } h1 { font-size: 44px; } .art { height: 300px; }
+    .stats { margin: 0 32px; } .products { height: auto; padding: 56px 32px 48px; }
+    .grid { grid-template-columns: 1fr; } footer { padding: 0 32px; }
+  }
+  /* hand-made reproduction: same layout, a few style details drifted */
+  .repro .btn { border-radius: 10px; box-shadow: none; }
+  .repro h1 { letter-spacing: -0.02em; }
+  .repro .stats b { color: #b85a26; }
+  .repro .price { font-weight: 600; }
+  .repro .tag { background: #f4e8d4; }
+  .repro .swatch.s2 { border-radius: 4px; }
+</style>
+</head>
+<body>
+<header><div class="logo">豆舍</div><nav><span>本周新豆</span><span>订阅</span><span>烘焙日志</span></nav><div class="pill">登录</div></header>
+<section class="hero">
+  <div>
+    <span class="tag">每周四现烘</span>
+    <h1>每周现烘的咖啡豆，直送你家。</h1>
+    <p class="lead">我们只买当季的小批次生豆，下单后三天内烘好寄出，开袋就是最好的风味。</p>
+    <div class="actions"><span class="btn">订阅本周新豆</span><span class="ghost">看看怎么烘 →</span></div>
+  </div>
+  <div class="art">
+    <svg width="280" height="320" viewBox="0 0 280 320" aria-hidden="true">
+      <path d="M60 60h160l16 60v170a16 16 0 0 1-16 16H60a16 16 0 0 1-16-16V120z" fill="#c8622b"/>
+      <path d="M60 60h160l-8 28H68z" fill="#a84e1f"/>
+      <rect x="84" y="150" width="112" height="84" rx="10" fill="#faf6ef"/>
+      <ellipse cx="140" cy="192" rx="22" ry="30" fill="#2b2118" transform="rotate(20 140 192)"/>
+      <path d="M130 170q10 22 20 44" stroke="#faf6ef" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M110 30q-10-14 0-26M140 36q-10-18 0-32M170 30q-10-14 0-26" stroke="#8a5a1f" stroke-width="5" fill="none" stroke-linecap="round" opacity=".5"/>
+    </svg>
+  </div>
+</section>
+<section class="stats"><div><b>72h</b><span>从烘焙到发货</span></div><div><b>9</b><span>个产区的小农庄</span></div><div><b>4.9</b><span>订阅用户平均评分</span></div></section>
+<section class="products">
+  <h2>本周在烘的三支豆子</h2>
+  <div class="grid">
+    <div class="card"><div class="swatch s1" style="background:#d9a066"></div><div><h3>埃塞 · 水洗</h3><p>柑橘与茉莉花香，口感干净明亮。</p></div><div class="row"><span class="price">¥68</span><span class="add">加入订阅</span></div></div>
+    <div class="card"><div class="swatch s2" style="background:#a86a3c"></div><div><h3>哥伦比亚 · 日晒</h3><p>红色浆果与可可，尾韵带一点酒香。</p></div><div class="row"><span class="price">¥72</span><span class="add">加入订阅</span></div></div>
+    <div class="card"><div class="swatch s3" style="background:#6b4a2f"></div><div><h3>云南 · 蜜处理</h3><p>焦糖与坚果，适合每天早上的那一杯。</p></div><div class="row"><span class="price">¥58</span><span class="add">加入订阅</span></div></div>
+  </div>
+</section>
+<footer><span>© 2026 豆舍(虚构品牌,仅用于 Kloon 演示)</span><span>每周四烘焙 · 周五发货</span></footer>
+<script>if (location.hash === '#repro') document.body.classList.add('repro')</script>
+</body>
+</html>

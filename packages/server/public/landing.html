@@ -139,19 +139,19 @@
 
       <figure class="compare enter" id="compare">
         <div class="stage">
-          <div class="layer under"><img src="/demo/repro.jpg" alt="还原页在 1440px 视口下的截图" width="1200" height="1066" fetchpriority="high" /></div>
-          <div class="layer over"><img src="/demo/capture.jpg" alt="原站在 1440px 视口下的截图" width="1200" height="1066" fetchpriority="high" /></div>
+          <div class="layer under"><img src="/demo/repro.jpg" alt="示例页的还原版本，在 1440px 视口下的截图" width="1200" height="1133" fetchpriority="high" /></div>
+          <div class="layer over"><img src="/demo/capture.jpg" alt="示例页原版，在 1440px 视口下的截图" width="1200" height="1133" fetchpriority="high" /></div>
           <div class="tags"><span>原站</span><span>还原页</span></div>
         </div>
         <input class="split-range" id="split" type="range" min="0" max="100" value="50" aria-label="拖动比较原站与还原页的截图" />
       </figure>
       <div class="figures enter">
-        <div class="figure pass"><b>0.9997</b><span>结构相似度（SSIM，1 为完全一致）</span><div class="meter"><i data-pct="100"></i></div></div>
-        <div class="figure pass"><b>0.03%</b><span>像素差异（占整页面积）</span><div class="meter"><i data-pct="8"></i></div></div>
-        <div class="figure"><b>6.1s</b><span>一轮捕获耗时</span><div class="meter"><i data-pct="61"></i></div></div>
+        <div class="figure pass"><b>0.9905</b><span>结构相似度（SSIM，1 为完全一致）</span><div class="meter"><i data-pct="99"></i></div></div>
+        <div class="figure pass"><b>0.28%</b><span>像素差异（占整页面积）</span><div class="meter"><i data-pct="7"></i></div></div>
+        <div class="figure"><b>2</b><span>个视口一起比对（1440 与 768）</span><div class="meter"><i data-pct="40"></i></div></div>
       </div>
-      <p class="band-note enter">左右拖动滑块，对比原站和还原页。两张都是同一视口下的真实截图，不是设计稿。</p>
-      <p class="proof-note enter">示例数据来自 Kloon 在自带测试页上的一次真实运行：41 个资源下载成功，3 个失败并被记录，共 1873 个 DOM 节点。</p>
+      <p class="band-note enter">左右拖动滑块，对比原站和还原页。这是示意：一个虚构品牌的示例页，和一份手工做的、细节略有出入的还原版。</p>
+      <p class="proof-note enter">两张图是同一视口下的真实截图，相似度和像素差异由 Kloon 的比对工具算出，不是手填的数字。</p>
     </div>
   </section>
 
@@ -165,8 +165,8 @@
           <div class="enter"><dt>交付</dt><dd>你拿到一个能跑的 React 工程：组件、样式和本地化好的图片，外加一份带截图与热力图的验证报告。</dd></div>
         </dl>
         <figure class="enter">
-          <div class="crop"><img src="/demo/capture-768.jpg" alt="同一页面在 768px 视口下的捕获截图" width="768" height="1297" loading="lazy" /></div>
-          <figcaption class="caption">多个视口一起跑。这是同一页面在 768px 下的捕获，只显示上半部分。</figcaption>
+          <div class="crop"><img src="/demo/capture-768.jpg" alt="同一示例页在 768px 视口下的捕获截图" width="768" height="2212" loading="lazy" /></div>
+          <figcaption class="caption">多个视口一起跑。这是同一示例页在 768px 下的捕获，只显示上半部分。</figcaption>
         </figure>
       </div>
     </div>
@@ -177,16 +177,16 @@
       <h2 class="mask"><span>哪里不一样，它直接告诉你。</span></h2>
       <div class="verify">
         <figure class="enter">
-          <img src="/demo/heatmap.jpg" alt="原站与还原页的像素差异热力图，红色为差异位置" width="1200" height="1066" loading="lazy" />
-          <figcaption class="caption">红色是两边不一致的像素，蓝色是被排除的动态区域。这张图随工程一起交付。</figcaption>
+          <img src="/demo/heatmap.jpg" alt="示例页原版与还原版的像素差异热力图，红色为差异位置" width="1200" height="1133" loading="lazy" />
+          <figcaption class="caption">红色是两边不一致的像素：这里是按钮的圆角和阴影、数字的颜色。碰到会动的区域，会被标成蓝色并排除。每次验证都会交付这样一张图。</figcaption>
         </figure>
         <div class="enter">
           <ul>
-            <li><span>结构相似度（SSIM）</span><b>0.9997</b></li>
-            <li><span>像素差异</span><b>0.03%</b></li>
-            <li><span>资源下载 成功 / 失败</span><b>41 / 3</b></li>
+            <li><span>结构相似度（SSIM）</span><b>0.9905</b></li>
+            <li><span>像素差异</span><b>0.28%</b></li>
+            <li><span>比对的视口</span><b>2</b></li>
             <li><span>动态区域</span><b>0</b></li>
-            <li><span>DOM 节点</span><b>1873</b></li>
+            <li><span>DOM 节点</span><b>71</b></li>
           </ul>
           <p>我们不承诺 100% 一致。动态内容、第三方组件和跨域字体可能对不上，报告会标出它们在哪里、为什么。</p>
         </div>
@@ -198,19 +198,19 @@
     <div class="wrap">
       <h2 class="mask"><span>拿到的是工程，不是截图。</span></h2>
       <div class="code">
-        <pre class="enter"><code>/** @region 0/1 (section.hero &gt; div.hero-bg, h1, button.cta) */
+        <pre class="enter"><code>/** @region 1/4 (section.hero &gt; span.tag, h1, p.lead, a.btn) */
 export function Hero() {
   return (
     &lt;section className="hero"&gt;
-      &lt;div className="hero-bg" /&gt;
-      &lt;h1&gt;Clone me if you can&lt;/h1&gt;
-      &lt;button className="cta" type="button"&gt;
-        Get Started
-      &lt;/button&gt;
+      &lt;span className="tag"&gt;每周四现烘&lt;/span&gt;
+      &lt;h1&gt;每周现烘的咖啡豆，直送你家。&lt;/h1&gt;
+      &lt;a className="btn" href="#subscribe"&gt;
+        订阅本周新豆
+      &lt;/a&gt;
     &lt;/section&gt;
   )
 }</code></pre>
-        <figcaption class="caption">这是生成结果里的一个组件。每个组件都带 @region 注释，指回原站对应的区域。</figcaption>
+        <figcaption class="caption">示意：生成结果里的一个组件长这样。每个组件都带 @region 注释，指回原站对应的区域。</figcaption>
         <ul class="files enter">
           <li>样式和设计 token 跟着工程走，图片已下载到 public/assets，不再依赖原站</li>
           <li>运行 npm install 再 npm run dev 就能打开</li>
@@ -261,7 +261,7 @@ export function Hero() {
       <a href="#output">产物</a>
       <a href="#fit">适合谁</a>
     </div>
-    <p class="note">页面上的截图、热力图和代码片段，都是 Kloon 在自带测试页上的真实运行结果。</p>
+    <p class="note">页面上的示例页是虚构品牌，不涉及任何真实网站。截图和热力图由 Kloon 在这个示例页上实际生成，代码片段仅为示意。</p>
   </div>
 </footer>
 

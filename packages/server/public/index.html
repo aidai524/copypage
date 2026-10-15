@@ -322,31 +322,31 @@ main { padding: 0 var(--margin); }
     {
       id: 'demo-20261014-1204', ownerId: 'demo', status: 'done',
       createdAt: new Date(Date.now() - 42 * 60000).toISOString(), updatedAt: new Date().toISOString(),
-      input: { type: 'url', source: 'https://fixture.local/pricing' },
+      input: { type: 'url', source: 'https://example.com/coffee' },
       options: { viewports: [1440, 768, 375] },
       progress: [{ at: new Date().toISOString(), message: 'viewport 1440: done' }],
-      loop: { round: 2, history: [{ ssim: 0.9997, pixelDiffPct: 0.03 }], escalated: false },
+      loop: { round: 2, history: [{ ssim: 0.9905, pixelDiffPct: 0.28 }], escalated: false },
       verifications: [{
         id: 'demo-v1', round: 1, status: 'done', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         repro: { type: 'zip', source: 'kloon-repro.zip' }, reproDir: '', progress: [],
         result: {
-          metrics: { ssim: 0.9997, pixelDiffPct: 0.03, dynamicAreaPct: 0 },
+          metrics: { ssim: 0.9905, pixelDiffPct: 0.28, dynamicAreaPct: 0 },
           decision: 'pass', entries: 2, durationMs: 4200,
           topEntries: [
-            { severity: 0.7, element: 'button.cta', property: 'boxShadow', expected: 'rgba(99,102,241,.4) 0 4px 14px', actual: 'none' },
-            { severity: 0.2, element: 'button.cta', property: 'borderRadius', expected: '12px', actual: '8px' },
+            { severity: 0.7, element: 'span.btn', property: 'boxShadow', expected: 'rgba(200,98,43,.35) 0 8px 20px', actual: 'none' },
+            { severity: 0.2, element: 'span.btn', property: 'borderRadius', expected: '14px', actual: '10px' },
           ],
           report: 'report.html', heatmaps: ['diffs/r1/heatmap-1440.png'],
         },
       }],
       generations: [],
-      result: { snapshotDir: '', title: 'Fixture · 定价页', viewports: [1440, 768, 375], screenshots: { '1440': 'demo/capture.jpg', '768': 'demo/capture-768.jpg' }, assetsOk: 41, assetsFailed: 3, dynamicRegions: 0, dismissed: 1, domNodes: 1873, durationMs: 6100 },
+      result: { snapshotDir: '', title: '豆舍 · 每周现烘咖啡豆（示例页）', viewports: [1440, 768, 375], screenshots: { '1440': 'demo/capture.jpg', '768': 'demo/capture-768.jpg' }, assetsOk: 12, assetsFailed: 0, dynamicRegions: 0, dismissed: 1, domNodes: 71, durationMs: 6100 },
       sizeBytes: 18432000,
     },
     {
       id: 'demo-20261014-1132', ownerId: 'demo', status: 'running',
       createdAt: new Date(Date.now() - 3 * 60000).toISOString(), updatedAt: new Date().toISOString(),
-      input: { type: 'url', source: 'https://fixture.local/landing' },
+      input: { type: 'url', source: 'https://example.com/landing' },
       options: { viewports: [1440] },
       progress: [
         { at: new Date().toISOString(), message: 'viewport 1440: loading' },
@@ -357,9 +357,9 @@ main { padding: 0 var(--margin); }
       verifications: [], generations: [],
       result: undefined, sizeBytes: 0,
     },
-    demoVariant('demo-20261014-1055', 'https://fixture.local/hero', 'done', 96),
-    demoVariant('demo-20261014-1021', 'https://fixture.local/pricing-table', 'done', 152),
-    demoVariant('demo-20261014-0958', 'https://fixture.local/docs', 'failed', 205),
+    demoVariant('demo-20261014-1055', 'https://example.com/hero', 'done', 96),
+    demoVariant('demo-20261014-1021', 'https://example.com/pricing', 'done', 152),
+    demoVariant('demo-20261014-0958', 'https://example.com/docs', 'failed', 205),
   ]
 
   // ---------- motion ----------
@@ -439,25 +439,25 @@ main { padding: 0 var(--margin); }
 
     const proofHtml = `
       <div class="proof">
-        <p class="enter">登录前也能看到它的产出：下面是 Kloon 在自带测试页上的真实运行结果，左边是原站，右边是还原页。</p>
+        <p class="enter">登录前也能看到它的产出：下面是一个虚构品牌的示例页，左边是原站，右边是手工还原的版本，比对由 Kloon 实际算出。</p>
         <div class="halves enter">
           <figure class="enter">
             <figcaption>原站截图</figcaption>
-            <div class="frame"><img src="/demo/capture.jpg" alt="工具捕获的原站截图" width="1200" height="1066" /></div>
+            <div class="frame"><img src="/demo/capture.jpg" alt="示例页原版截图" width="1200" height="1133" /></div>
           </figure>
           <figure class="enter">
             <figcaption>还原页截图</figcaption>
-            <div class="frame"><img src="/demo/repro.jpg" alt="还原页在相同视口下的截图" width="1200" height="1066" /></div>
+            <div class="frame"><img src="/demo/repro.jpg" alt="示例页还原版在相同视口下的截图" width="1200" height="1133" /></div>
           </figure>
         </div>
         <figure class="shot enter">
-          <img src="/demo/heatmap.jpg" alt="原站与还原页的像素差异热力图" width="1200" height="1066" loading="lazy" />
+          <img src="/demo/heatmap.jpg" alt="示例页原版与还原版的像素差异热力图" width="1200" height="1133" loading="lazy" />
           <figcaption>差异热力图 · 红色是两边不一致的像素</figcaption>
         </figure>
         <div class="figures">
-          <div class="figure pass enter"><b>0.9997</b><span>结构相似度（SSIM）</span><div class="meter"><i data-pct="100"></i></div></div>
-          <div class="figure pass enter"><b>0.03%</b><span>像素差异</span><div class="meter"><i data-pct="12"></i></div></div>
-          <div class="figure enter"><b>6.1s</b><span>一轮捕获耗时</span><div class="meter"><i data-pct="61"></i></div></div>
+          <div class="figure pass enter"><b>0.9905</b><span>结构相似度（SSIM）</span><div class="meter"><i data-pct="99"></i></div></div>
+          <div class="figure pass enter"><b>0.28%</b><span>像素差异</span><div class="meter"><i data-pct="7"></i></div></div>
+          <div class="figure enter"><b>71</b><span>个 DOM 节点参与比对</span><div class="meter"><i data-pct="30"></i></div></div>
         </div>
       </div>`
 
@@ -865,7 +865,7 @@ main { padding: 0 var(--margin); }
   }
 
   // ---------- detail ----------
-  // demo mode serves bundled artifacts straight from /demo/* (real captures of our own fixture)
+  // demo mode serves bundled artifacts straight from /demo/* (an original sample page, see tools/demo-assets)
   const artifactUrl = (t, rel) => rel.startsWith('demo/') ? '/' + rel : `/api/tasks/${t.id}/artifacts/${rel}`
   const fileUrl = (t, rel) => DEMO ? '/' + (rel.includes('heatmap') ? 'demo/heatmap.jpg' : 'demo/repro.jpg') : `/api/tasks/${t.id}/files/${rel}`
 
@@ -1317,12 +1317,12 @@ main { padding: 0 var(--margin); }
 
   // ---------- demo mode ----------
   function demoSubmit(source) {
-    const next = { ...DEMO_TASKS[1], id: 'demo-' + Date.now().toString(36), input: { type: 'url', source: source || 'https://fixture.local/landing' }, status: 'running', result: undefined, sizeBytes: 0 }
+    const next = { ...DEMO_TASKS[1], id: 'demo-' + Date.now().toString(36), input: { type: 'url', source: source || 'https://example.com/landing' }, status: 'running', result: undefined, sizeBytes: 0 }
     state.tasks.unshift(next)
     navigate(taskUrl(next.id))
     setTimeout(() => {
       next.status = 'done'
-      next.result = { ...DEMO_TASKS[0].result, screenshots: { '1440': 'demo/capture.jpg' }, title: 'Fixture · 新捕获' }
+      next.result = { ...DEMO_TASKS[0].result, screenshots: { '1440': 'demo/capture.jpg' }, title: '示例页 · 新捕获' }
       next.verifications = DEMO_TASKS[0].verifications
       upsert(next)
       sync()
