@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Kloon · 把任意网页还原成代码</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2318191b'/%3E%3Crect x='7' y='7' width='18' height='18' fill='%23ff4a1f'/%3E%3C/svg%3E" />
+<title>Kloon 控制台</title>
+<meta name="theme-color" content="#0b0b0e" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0b0e'/%3E%3Cpath d='M20 44V20h7v10l9-10h8L33 32l11 12h-8l-9-10v10z' fill='%234ade80'/%3E%3C/svg%3E" />
 <script>document.documentElement.classList.add('js')</script>
 <link rel="stylesheet" href="/base.css" />
 <style>
@@ -30,10 +31,16 @@ img { display: block; max-width: 100%; }
 .who { font-size: var(--step-small); color: var(--muted); }
 .banner {
     display: flex; align-items: center; gap: 12px;
-    margin: var(--margin) var(--margin) 0; padding: 14px 16px;
-    background: var(--surface); border-left: 3px solid var(--accent);
+    position: sticky; top: 0; z-index: 5;
+    margin: var(--margin) var(--margin) 0; padding: 12px 16px;
+    background: var(--surface-2); border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
     font-size: var(--step-small);
   }
+.banner.bad { border-left-color: var(--danger); }
+.banner .msg { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.banner .x { flex: 0 0 auto; padding: 6px 10px; border-radius: var(--radius); color: var(--muted); }
+.banner .x:hover { color: var(--ink); background: var(--surface); }
 .banner[hidden] { display: none; }
 main { padding: 0 var(--margin); }
 .grid { display: grid; grid-template-columns: minmax(0, var(--ledger)) minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); align-items: start; }
@@ -50,14 +57,39 @@ main { padding: 0 var(--margin); }
 .capture { background: var(--surface); padding: 18px; display: grid; gap: 14px; }
 .capture-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .capture label { display: grid; gap: 6px; font-size: var(--step-small); color: var(--muted); }
-.capture .grow { flex: 1 1 240px; min-width: 0; }
+.capture .grow { flex: 1 1 240px; min-width: 0; display: grid; gap: 6px; }
+.capture input[aria-invalid=true] { border-color: var(--danger); }
+.capture .opts label { line-height: 1.4; }
+.capture .form-actions { padding-top: 4px; }
+.capture .form-actions .action { min-height: 44px; padding: 0 24px; }
 .capture .grow input { width: 100%; }
 .capture .opts { display: flex; gap: 18px; flex-wrap: wrap; font-size: var(--step-small); color: var(--muted); }
 .capture .opts label { display: flex; align-items: center; gap: 8px; }
   /* ---------- page frame: list / new / detail / admin share one router outlet ---------- */
   #page { max-width: 1180px; margin: 0 auto; padding: 0 var(--margin) clamp(40px, 6vw, 80px); }
   .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: clamp(24px, 4vw, 48px) 0 20px; }
-  .page-head h1 { font-size: clamp(2rem, 4.8vw, 6rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .page-head > div { min-width: 0; }
+  .page-head h1 { font-size: clamp(1.75rem, 3.2vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .page-head h1.host { overflow-wrap: anywhere; white-space: normal; }
+  .page-head h1.host small { display: block; margin-top: 4px; font-size: var(--step-body); font-weight: 400; letter-spacing: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .usage { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 16px; padding: 0; list-style: none; color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+  .usage b { color: var(--ink); font-weight: 600; }
+  .usage .near b { color: var(--danger); }
+  .empty-card { background: var(--surface); border-radius: var(--radius); padding: clamp(24px, 4vw, 40px); display: grid; gap: 14px; justify-items: start; }
+  .empty-card h2 { font-size: var(--step-lead); letter-spacing: -0.02em; line-height: 1.2; }
+  .state-art { width: min(100%, 360px); height: auto; border-radius: var(--radius); }
+  .state-art.wide { width: min(100%, 420px); }
+  .empty-card p { color: var(--muted); font-size: var(--step-body); max-width: 52ch; }
+  .hint { color: var(--muted); font-size: var(--step-small); }
+  .field-error { color: var(--danger); font-size: var(--step-small); min-height: 1.2em; }
+  .advanced { background: var(--surface-2); border-radius: var(--radius); padding: 10px 14px; }
+  .advanced summary { cursor: pointer; color: var(--muted); font-size: var(--step-small); }
+  .advanced summary:hover { color: var(--ink); }
+  .advanced[open] summary { margin-bottom: 12px; }
+  .table-scroll { overflow-x: auto; }
+  .run, .run-head, .run-body { min-width: 0; }
+  .run-head .title { overflow-wrap: anywhere; }
+  .log { overflow-wrap: anywhere; }
   .page-head .action { text-decoration: none; }
   .page-note { margin: 12px 0 0; color: var(--muted); font-size: var(--step-body); max-width: 62ch; }
   .head-actions { display: flex; align-items: center; gap: 16px; }
@@ -78,8 +110,9 @@ main { padding: 0 var(--margin); }
   .task-row .thumb { grid-row: 1 / span 2; width: 104px; aspect-ratio: 16 / 10; border-radius: var(--radius); overflow: hidden; background: var(--surface-2); }
   .task-row .thumb:empty { background: none; }
   .task-row .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
-  .task-row .name { font-size: var(--step-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .task-row .kind { color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+  .task-row .name { font-size: var(--step-body); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-row .name .rest { font-weight: 400; color: var(--muted); }
+  .task-row .kind { color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .task-row .metric { grid-column: 3; grid-row: 1 / span 2; text-align: right; font-variant-numeric: tabular-nums; }
   .task-row .metric b { display: block; font-size: var(--step-body); font-weight: 600; }
   .task-row .metric span { color: var(--muted); font-size: var(--step-small); }
@@ -96,6 +129,14 @@ main { padding: 0 var(--margin); }
   .progress { height: 4px; background: var(--surface-2); border-radius: var(--radius); overflow: hidden; }
   .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .6s cubic-bezier(.2, .7, .2, 1); }
   .progress-note { margin: 12px 0 0; color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+  .progress-card { margin-bottom: 18px; }
+  .progress-card.finished .progress { height: 2px; }
+  #log-details > summary { cursor: pointer; list-style: none; margin: 0; }
+  #log-details > summary::-webkit-details-marker { display: none; }
+  #log-details > summary::after { content: "展开"; color: var(--muted); font-size: var(--step-small); }
+  #log-details[open] > summary::after { content: "收起"; }
+  #log-details[open] > summary { margin-bottom: 18px; }
+  #log-details > summary .count { margin-left: auto; }
 
   /* ---------- streamed log: lines are appended, never re-rendered ---------- */
   .log-line { display: block; animation: lineIn .3s cubic-bezier(.2, .7, .2, 1); }
@@ -156,6 +197,9 @@ main { padding: 0 var(--margin); }
   .frame.auto img { height: auto; }
   .auth { max-width: 420px; margin: clamp(28px, 7vw, 80px) 0; display: grid; gap: 26px; }
 .auth form { display: grid; gap: 12px; }
+.auth .form-title { font-size: var(--step-lead); letter-spacing: -0.02em; line-height: 1.2; }
+.auth label { font-size: var(--step-small); color: var(--muted); }
+.auth .action { min-height: 44px; }
 .auth .swap { justify-self: start; color: var(--muted); font-size: var(--step-small); text-decoration: underline; text-underline-offset: 3px; }
 .auth .swap:hover { color: var(--ink); }
 .auth details { background: var(--surface); border-radius: var(--radius); padding: 12px 14px; }
@@ -185,7 +229,7 @@ main { padding: 0 var(--margin); }
   </div>
 </header>
 
-<div class="banner" id="banner" hidden></div>
+<div class="banner" id="banner" role="status" aria-live="polite" hidden></div>
 
 <main id="main">
   <div id="page"><p class="empty" style="padding:48px var(--margin)">正在载入…</p></div>
@@ -211,10 +255,49 @@ main { padding: 0 var(--margin); }
   function api(path, init = {}) {
     return fetch(path, { credentials: 'same-origin', ...init, headers: { ...(init.headers || {}) } })
   }
+  // the API answers in English; people read it in Chinese
+  const ERR = {
+    'invalid email or password': '邮箱或密码不正确。',
+    'email already registered': '这个邮箱已经注册过了，直接登录即可。',
+    'valid email required': '请填写有效的邮箱地址。',
+    'password must be at least 8 characters': '密码至少需要 8 位。',
+    'email not verified': '邮箱还没验证，请先打开注册邮件里的链接。',
+    'invalid or expired verification token': '验证链接无效或已过期。',
+    'invalid or expired reset token': '重置链接无效或已过期，请重新申请。',
+    'unauthorized': '登录已过期，请重新登录。',
+    'unknown task': '找不到这个任务，可能已被删除。',
+    'capture must finish before verifying': '捕获完成后才能验证。',
+    'path-based verification is admin-only — upload a zip instead': '按路径验证仅限管理员，请上传 zip。',
+    'type must be url|image|video and source must be non-empty': '请先填写页面地址。',
+  }
+  const zh = (m) => {
+    const msg = String(m ?? '')
+    if (ERR[msg]) return ERR[msg]
+    let hit
+    if ((hit = msg.match(/^domain blocked by moderation: (.+)$/))) return `站点 ${hit[1]} 已被平台封禁，无法捕获。`
+    if ((hit = msg.match(/^server task limit reached/))) return '服务器任务数已满，请稍后再试。'
+    if (/rate limit|too many/i.test(msg)) return '操作太频繁了，请稍等几分钟再试。'
+    return msg
+  }
+  let bannerTimer = null
   function banner(msg) {
     const el = $('#banner')
-    el.textContent = msg || ''
-    el.hidden = !msg
+    clearTimeout(bannerTimer)
+    el.classList.toggle('bad', Boolean(msg))
+    el.textContent = ''
+    if (!msg) { el.hidden = true; return }
+    const text = document.createElement('span')
+    text.className = 'msg'
+    text.textContent = zh(msg)
+    const close = document.createElement('button')
+    close.type = 'button'
+    close.className = 'x'
+    close.textContent = '关闭'
+    close.setAttribute('aria-label', '关闭提示')
+    close.onclick = () => banner('')
+    el.append(text, close)
+    el.hidden = false
+    bannerTimer = setTimeout(() => banner(''), 8000)
   }
   function upsert(task) { const i = state.tasks.findIndex((t) => t.id === task.id); if (i >= 0) state.tasks[i] = task; else state.tasks.unshift(task) }
 
@@ -309,10 +392,11 @@ main { padding: 0 var(--margin); }
       <div class="auth">
         <div>
           <h1 class="mask"><span>把网页读成代码。</span></h1>
-          <p class="enter" style="margin-top:16px">Kloon 捕获一个可访问的页面，读出它的结构与样式，收敛到像素级一致，产出可运行的 React + Tailwind 工程。</p>
+          <p class="enter" style="margin-top:16px">贴一个公开网址，Kloon 把它捕获下来，逐像素比对，交付可运行的 React + Tailwind 工程和一份验证报告。</p>
         </div>
 
         <form id="login-form" class="enter">
+          <h2 class="form-title">登录</h2>
           <label for="login-email">邮箱</label>
           <input type="email" id="login-email" autocomplete="username" required />
           <label for="login-password">密码</label>
@@ -323,6 +407,8 @@ main { padding: 0 var(--margin); }
         </form>
 
         <form id="register-form" hidden>
+          <h2 class="form-title">创建账号</h2>
+          <p class="hint">免费使用。注册后需要先验证邮箱，才能提交捕获。</p>
           <label for="reg-email">邮箱</label>
           <input type="email" id="reg-email" autocomplete="username" required />
           <label for="reg-password">密码（至少 8 位）</label>
@@ -332,13 +418,16 @@ main { padding: 0 var(--margin); }
         </form>
 
         <form id="reset-form" hidden>
-          <label for="reset-password">设置新密码（至少 8 位）</label>
+          <h2 class="form-title">设置新密码</h2>
+          <label for="reset-password">新密码（至少 8 位）</label>
           <input type="password" id="reset-password" autocomplete="new-password" required minlength="8" />
           <button class="action" type="submit">保存并登录</button>
           <button class="swap" type="button" id="reset-cancel">返回登录</button>
         </form>
 
         <form id="forgot-form" hidden>
+          <h2 class="form-title">找回密码</h2>
+          <p class="hint">填写注册邮箱，我们会发一封重置密码的邮件。</p>
           <label for="forgot-email">注册邮箱</label>
           <input type="email" id="forgot-email" autocomplete="username" required />
           <button class="action" type="submit">发送重置链接</button>
@@ -350,27 +439,23 @@ main { padding: 0 var(--margin); }
 
     const proofHtml = `
       <div class="proof">
-        <p class="enter">不用登录就能看的东西：这是工具链自己的输出。左边是原站截图，右边是同一视口下还原页的截图，下面是两边的像素差异热力图。</p>
+        <p class="enter">登录前也能看到它的产出：下面是 Kloon 在自带测试页上的真实运行结果，左边是原站，右边是还原页。</p>
         <div class="halves enter">
           <figure class="enter">
-            <figcaption>输入 · 原站截图</figcaption>
-            <div class="frame"><img src="/demo/capture.jpg" alt="工具捕获的原站截图" width="1200" height="750" /></div>
+            <figcaption>原站截图</figcaption>
+            <div class="frame"><img src="/demo/capture.jpg" alt="工具捕获的原站截图" width="1200" height="1066" /></div>
           </figure>
           <figure class="enter">
-            <figcaption>输出 · 还原页截图</figcaption>
-            <div class="frame"><img src="/demo/repro.jpg" alt="还原页在相同视口下的截图" width="1200" height="750" /></div>
+            <figcaption>还原页截图</figcaption>
+            <div class="frame"><img src="/demo/repro.jpg" alt="还原页在相同视口下的截图" width="1200" height="1066" /></div>
           </figure>
         </div>
-        <figure class="band enter" style="margin-top:0">
-          <figcaption>差异热力图 · 红色像素为差异位置</figcaption>
-          <div class="frame"><img src="/demo/heatmap.jpg" alt="原站与还原页的像素差异热力图" width="1200" height="515" /></div>
-        </figure>
-        <figure class="band enter">
-          <figcaption>第二个视口 · 768px 下的捕获</figcaption>
-          <div class="frame auto"><img src="/demo/capture-768.jpg" alt="同一页面在 768px 视口下的捕获截图" width="900" height="1200" /></div>
+        <figure class="shot enter">
+          <img src="/demo/heatmap.jpg" alt="原站与还原页的像素差异热力图" width="1200" height="1066" loading="lazy" />
+          <figcaption>差异热力图 · 红色是两边不一致的像素</figcaption>
         </figure>
         <div class="figures">
-          <div class="figure pass enter"><b>0.9997</b><span>SSIM 结构相似度</span><div class="meter"><i data-pct="100"></i></div></div>
+          <div class="figure pass enter"><b>0.9997</b><span>结构相似度（SSIM）</span><div class="meter"><i data-pct="100"></i></div></div>
           <div class="figure pass enter"><b>0.03%</b><span>像素差异</span><div class="meter"><i data-pct="12"></i></div></div>
           <div class="figure enter"><b>6.1s</b><span>一轮捕获耗时</span><div class="meter"><i data-pct="61"></i></div></div>
         </div>
@@ -382,7 +467,7 @@ main { padding: 0 var(--margin); }
     $('#tab-admin').hidden = true
 
     const notice = (msg, bad = false) => {
-      $('#auth-notice').innerHTML = msg ? `<p class="notice${bad ? ' bad' : ''}">${esc(msg)}</p>` : ''
+      $('#auth-notice').innerHTML = msg ? `<p class="notice${bad ? ' bad' : ''}" role="${bad ? 'alert' : 'status'}">${esc(zh(msg))}</p>` : ''
     }
     const show = (which) => {
       $('#login-form').hidden = which !== 'login'
@@ -548,15 +633,38 @@ main { padding: 0 var(--margin); }
   }
 
   // ---------- list ----------
+  // "5 分钟前" reads faster than a timestamp; the exact time stays in the tooltip
+  function ago(iso) {
+    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
+    if (isNaN(s)) return ''
+    if (s < 60) return '刚刚'
+    if (s < 3600) return `${Math.floor(s / 60)} 分钟前`
+    if (s < 86400) return `${Math.floor(s / 3600)} 小时前`
+    return `${Math.floor(s / 86400)} 天前`
+  }
+  function hostOf(source) {
+    try { const u = new URL(source); return { host: u.hostname, rest: (u.pathname + u.search).replace(/^\/$/, '') } } catch { return { host: source, rest: '' } }
+  }
+
+  // second line of a row: age and viewport count, or the reason it failed
+  function kindText(t) {
+    if (t.status === 'failed') {
+      const why = String(t.error ?? '').split('\n').find((l) => l.trim()) ?? ''
+      return why ? `${ago(t.createdAt)} · ${why.trim()}` : ago(t.createdAt)
+    }
+    return `${ago(t.createdAt)} · ${(t.options?.viewports ?? []).length || 1} 个视口`
+  }
+
   function taskRow(t) {
     const shot = t.result?.screenshots?.[String(t.result?.viewports?.[0])] ?? ''
     const metric = t.result?.metrics ?? t.verifications?.at(-1)?.result?.metrics
+    const { host, rest } = hostOf(t.input.source)
     const li = document.createElement('li')
     li.innerHTML = `
       <a class="task-row enter" href="${taskUrl(t.id)}" data-id="${esc(t.id)}">
         <span class="thumb">${shot ? `<img src="${esc(artifactUrl(t, shot))}" alt="${esc(t.input.source)} 的捕获截图" width="320" height="200" loading="lazy" />` : ''}</span>
-        <span class="name">${esc(t.input.source)}</span>
-        <span class="kind">${esc(t.id)} · ${fmtTime(t.createdAt)}</span>
+        <span class="name" title="${esc(t.input.source)}">${esc(host)}<span class="rest">${esc(rest)}</span></span>
+        <span class="kind" data-role="kind" title="${esc(fmtTime(t.createdAt))}">${esc(kindText(t))}</span>
         <span class="metric"><b class="state ${t.status}" data-role="status">${STATUS[t.status]}</b><span data-role="metric">${metric ? `SSIM ${metric.ssim}` : ''}</span></span>
         <span class="row-progress" data-role="row-progress" hidden><i></i></span>
       </a>`
@@ -572,13 +680,40 @@ main { padding: 0 var(--margin); }
         </div>
         <a class="action enter" href="/app/new" id="create-btn">新建任务</a>
       </div>
+      <ul class="usage" id="usage" aria-label="今日额度"></ul>
       <ul class="tasks enter" id="tasks"></ul>
-      <p class="empty" id="tasks-empty" hidden>还没有任务。点上面「新建任务」开始。</p>`
+      <div class="empty-card" id="tasks-empty" hidden>
+        <img class="state-art" src="/art/empty-tasks.webp" alt="" width="1280" height="800" loading="lazy" />
+        <h2>还没有任务</h2>
+        <p>贴一个公开网址，Kloon 会在后台捕获它。捕获大约需要几秒到一分钟，可以关掉页面回来再看。</p>
+        <a class="action" href="/app/new" id="empty-create">新建第一个任务</a>
+      </div>`
     observeEntrances(page)
     fillBars(page)
     revealMasked()
     patchList()
     page.querySelector('#create-btn').onclick = (e) => { e.preventDefault(); navigate('/app/new') }
+    page.querySelector('#empty-create').onclick = (e) => { e.preventDefault(); navigate('/app/new') }
+  }
+
+  /** the quota the account already has, shown where it matters: before it runs out */
+  function usageItems() {
+    const me = state.me
+    if (!me?.quota || me.user?.role === 'admin') return []
+    const q = me.quota, u = me.usage ?? {}
+    const caps = u.capture ?? 0
+    const items = [
+      { label: '今日捕获', used: caps, max: q.maxCapturesPerDay, text: `${caps} / ${q.maxCapturesPerDay}` },
+      { label: '任务', used: state.tasks.length, max: q.maxTasks, text: `${state.tasks.length} / ${q.maxTasks}` },
+      { label: '存储', used: me.totals?.storageBytes ?? 0, max: q.maxStorageBytes, text: `${fmtBytes(me.totals?.storageBytes ?? 0)} / ${fmtBytes(q.maxStorageBytes)}` },
+    ]
+    return items.filter((i) => i.max > 0 && i.max < Infinity)
+  }
+  function paintUsage() {
+    const ul = $('#usage')
+    if (!ul) return
+    const html = usageItems().map((i) => `<li class="${i.used / i.max >= 0.8 ? 'near' : ''}">${i.label} <b>${esc(i.text)}</b></li>`).join('')
+    if (ul.dataset.sig !== html) { ul.innerHTML = html; ul.dataset.sig = html }
   }
 
   function patchList() {
@@ -590,6 +725,7 @@ main { padding: 0 var(--margin); }
     setText(note, state.tasks.length ? `共 ${state.tasks.length} 个${running ? ` · ${running} 个进行中` : ''}` : '')
     const empty = $('#tasks-empty')
     if (empty) empty.hidden = state.tasks.length > 0
+    paintUsage()
 
     // add or move rows in order, patch the text in place (no innerHTML reset, so
     // screenshots and scroll position stay put)
@@ -606,6 +742,7 @@ main { padding: 0 var(--margin); }
         })
       } else {
         known.delete(t.id)
+        setText(li.querySelector('[data-role=kind]'), kindText(t))
         const badge = li.querySelector('[data-role=status]')
         setText(badge, STATUS[t.status])
         setClass(badge, `state ${t.status}`)
@@ -642,41 +779,70 @@ main { padding: 0 var(--margin); }
         </div>
         <div class="head-actions enter"><a class="back" href="/app" id="cancel-btn">← 任务列表</a></div>
       </div>
-      <form class="capture" id="new-task">
+      <form class="capture" id="new-task" novalidate>
         <div class="capture-row enter">
           <div class="grow">
             <label for="source">页面地址</label>
-            <input type="text" id="source" placeholder="https://example.com" required autofocus />
+            <input type="text" id="source" placeholder="https://example.com" inputmode="url" autocapitalize="off" autocomplete="url" spellcheck="false" required autofocus aria-describedby="source-hint source-err" />
+            <span class="hint" id="source-hint">只能捕获公开可访问的页面，需要登录的页面不行。</span>
+            <span class="field-error" id="source-err" role="alert"></span>
           </div>
-          <label for="type">类型
-            <select id="type"><option value="url">网址</option><option value="image">图片路径</option><option value="video">视频路径</option></select>
-          </label>
+          ${isAdmin() ? `<label for="type">类型
+            <select id="type"><option value="url">网址</option><option value="image">图片路径（服务器）</option><option value="video">视频路径（服务器）</option></select>
+          </label>` : '<input type="hidden" id="type" value="url" />'}
         </div>
         <div class="capture-row enter">
-          <div class="grow"><label for="viewports">视口宽度（逗号分隔）</label><input type="text" id="viewports" value="1440,768,375" /></div>
-          <div class="grow"><label for="maxNodes">DOM 节点上限</label><input type="text" id="maxNodes" value="4000" /></div>
+          <div class="grow">
+            <label for="viewports">视口宽度（像素，逗号分隔）</label>
+            <input type="text" id="viewports" value="1440,768,375" inputmode="numeric" aria-describedby="viewports-hint viewports-err" />
+            <span class="hint" id="viewports-hint">常用：1440 桌面，768 平板，375 手机。最多 5 个，范围 320 到 3840。</span>
+            <span class="field-error" id="viewports-err" role="alert"></span>
+          </div>
         </div>
         <div class="opts enter">
-          <label><input type="checkbox" id="dynamic" checked /> 动态区域检测</label>
-          <label><input type="checkbox" id="states" /> 交互态捕获（慢）</label>
+          <label><input type="checkbox" id="dynamic" checked /> 识别会动的区域（轮播、实时数据），比对时排除</label>
+          <label><input type="checkbox" id="states" /> 同时捕获点击后的状态（更慢）</label>
         </div>
+        <details class="advanced enter">
+          <summary>高级设置</summary>
+          <div class="grow"><label for="maxNodes">DOM 节点上限</label><input type="text" id="maxNodes" value="4000" inputmode="numeric" /><span class="hint">超大页面可调高，范围 500 到 50000。</span></div>
+        </details>
         <div class="form-actions enter">
           <button class="action enter" type="submit" id="submit">开始捕获</button>
-          <span class="quiet">提交后跳到该任务的详情页。</span>
+          <span class="quiet">${quotaHint()}</span>
         </div>
       </form>`
     observeEntrances(page)
     revealMasked()
     page.querySelector('#cancel-btn').onclick = (e) => { e.preventDefault(); navigate('/app') }
+    const fieldErr = (id, msg) => { $('#' + id + '-err').textContent = msg; $('#' + (id === 'source' ? 'source' : 'viewports')).setAttribute('aria-invalid', msg ? 'true' : 'false') }
+    $('#source').oninput = () => fieldErr('source', '')
+    $('#viewports').oninput = () => fieldErr('viewports', '')
     $('#new-task').onsubmit = async (e) => {
       e.preventDefault()
       const btn = $('#submit')
+      const type = $('#type').value
+      let source = $('#source').value.trim()
+      // people paste "example.com"; make it a URL instead of bouncing them
+      if (type === 'url' && source && !/^https?:\/\//i.test(source)) source = 'https://' + source
+      fieldErr('source', ''); fieldErr('viewports', '')
+      if (!source) { fieldErr('source', '请填写页面地址。'); $('#source').focus(); return }
+      if (type === 'url') {
+        try { if (!new URL(source).hostname.includes('.')) throw new Error() } catch { fieldErr('source', '这个地址看起来不对，示例：https://example.com'); $('#source').focus(); return }
+      }
+      const viewports = $('#viewports').value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean).map(Number)
+      if (!viewports.length || viewports.length > 5 || viewports.some((v) => !Number.isInteger(v) || v < 320 || v > 3840)) {
+        fieldErr('viewports', '请填 1 到 5 个 320 到 3840 之间的整数，例如 1440,768,375。')
+        $('#viewports').focus()
+        return
+      }
+      $('#source').value = source
       btn.disabled = true
+      btn.textContent = '正在提交…'
       try {
-        const viewports = $('#viewports').value.split(',').map((s) => Number(s.trim())).filter(Boolean)
         const body = {
-          type: $('#type').value,
-          source: $('#source').value.trim(),
+          type,
+          source,
           options: { viewports, maxNodes: Number($('#maxNodes').value) || 4000, dynamic: $('#dynamic').checked, states: $('#states').checked },
         }
         if (DEMO) { demoSubmit(body.source); return }
@@ -685,8 +851,17 @@ main { padding: 0 var(--margin); }
         if (!res.ok) throw new Error(data.error || res.statusText)
         upsert(data.task)
         navigate(taskUrl(data.task.id)) // the new task opens on its own page
-      } catch (err) { banner(err.message) } finally { btn.disabled = false }
+      } catch (err) { banner(err.message) } finally { btn.disabled = false; btn.textContent = '开始捕获' }
     }
+  }
+
+  const isAdmin = () => state.me?.user?.role === 'admin'
+  /** how much of today's allowance is left, so a refusal is never a surprise */
+  function quotaHint() {
+    const q = state.me?.quota, used = state.me?.usage?.capture ?? 0
+    if (isAdmin() || !q?.maxCapturesPerDay) return '提交后会跳到这个任务的详情页。'
+    const left = Math.max(0, q.maxCapturesPerDay - used)
+    return left ? `今天还剩 ${left} 次捕获。提交后会跳到详情页。` : '今天的捕获次数已用完，明天恢复。'
   }
 
   // ---------- detail ----------
@@ -711,8 +886,8 @@ main { padding: 0 var(--margin); }
       <section class="detail-block enter">
         <div class="section-head" style="margin:0 0 18px"><h2>自动生成</h2></div>
         <div class="vform">
-          <button class="action" id="generate-btn">启动自动生成</button>
-          <p style="margin-top:12px;color:var(--muted);font-size:var(--step-small)">agent 按 copypage skill 读取快照生成工程，每轮由服务端验证并回传差异清单。</p>
+          <button class="action" id="generate-btn">让 AI 生成 React 工程</button>
+          <p class="hint" style="margin-top:12px">AI 会读取这次捕获的结果来写代码。每写完一轮，服务端自动验证并把差异清单交回去，直到足够接近或达到轮次上限。</p>
         </div>
       </section>`
     return `
@@ -743,10 +918,11 @@ main { padding: 0 var(--margin); }
           ${r.heatmaps.map((h) => `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + h)}" target="_blank" rel="noreferrer">热力图 ${h.match(/heatmap-(\d+)/)?.[1] ?? ''}px</a>`).join('')}
           ${r.vlmRequests ? `<a href="${fileUrl(t, 'verifications/' + v.id + '/' + r.vlmRequests)}" target="_blank" rel="noreferrer">VLM 队列</a>` : ''}
         </div>` : ''
-      const entries = r?.topEntries?.length ? `<table class="entries">
-          <thead><tr><th>severity</th><th>元素</th><th>属性</th><th>原站</th><th>还原</th></tr></thead>
+      const entries = r?.topEntries?.length ? `<div class="table-scroll"><table class="entries">
+          <caption class="hint" style="text-align:left;padding-bottom:8px">差异最大的几处，严重度越高越该先改</caption>
+          <thead><tr><th>严重度</th><th>元素</th><th>属性</th><th>原站</th><th>还原页</th></tr></thead>
           <tbody>${r.topEntries.map((e) => `<tr><td class="sev">${e.severity}</td><td>${esc(e.element)}</td><td>${esc(e.property)}</td><td>${esc(e.expected)}</td><td>${esc(e.actual)}</td></tr>`).join('')}</tbody>
-        </table>` : ''
+        </table></div>` : ''
       return `<article class="run">
         <div class="run-head">
           <span class="title">第 ${v.round} 轮 · ${esc(v.repro.type)} ${esc(v.repro.source)}</span>
@@ -765,15 +941,15 @@ main { padding: 0 var(--margin); }
         <div class="section-head" style="margin:0 0 18px"><h2>验证还原页</h2><span class="count">${runs.length} 轮</span></div>
         <form class="admin-forms" id="verify-form" data-ui>
           <div class="row">
-            <input type="text" id="verify-path" placeholder="还原工程目录（管理员可填服务器路径）" style="flex:1 1 260px" />
-            <button class="action ghost small" type="button" id="verify-path-btn">验证路径</button>
-            <button class="action ghost small" type="button" id="verify-zip-btn">上传 zip 验证</button>
+            <button class="action small" type="button" id="verify-zip-btn">上传 zip 验证</button>
+            ${isAdmin() ? `<input type="text" id="verify-path" placeholder="或填服务器上的工程目录" style="flex:1 1 260px" aria-label="服务器上的还原工程目录" />
+            <button class="action ghost small" type="button" id="verify-path-btn">验证路径</button>` : ''}
             <input type="file" id="verify-zip" accept=".zip" hidden />
           </div>
-          <p style="color:var(--muted);font-size:var(--step-small)">构建 + 同一套探测脚本 → 像素/DOM 比对（动态区域遮罩）→ 报告 → 收敛判定。普通账号请用 zip。</p>
+          <p class="hint">把你的还原工程打成 zip 上传（需要已构建好的 dist，或纯静态文件）。Kloon 会在同样的视口下截图，逐像素比对，再给出报告和热力图。</p>
         </form>
         ${history}
-        <div class="stack">${rows || '<p class="empty">还没有验证记录。</p>'}</div>
+        <div class="stack">${rows || '<p class="empty">还没有验证记录。上传还原工程的 zip，就能看到相似度、差异清单和热力图。</p>'}</div>
       </section>`
   }
 
@@ -785,15 +961,17 @@ main { padding: 0 var(--margin); }
           <h1 class="mask"><span>找不到任务</span></h1>
           <div class="head-actions"><a class="back" href="/app" id="back-btn">← 任务列表</a></div>
         </div>
+        <img class="state-art wide" src="/art/task-error.webp" alt="" width="1280" height="800" loading="lazy" />
         <p class="empty">这个任务可能已经被删除了。</p>`
       page.querySelector('#back-btn').onclick = (e) => { e.preventDefault(); navigate('/app') }
       return
     }
+    const { host, rest } = hostOf(t.input.source)
     page.innerHTML = `
       <div class="page-head">
         <div>
-          <h1 class="mask" title="${esc(t.input.source)}"><span>${esc(t.input.source)}</span></h1>
-          <p class="page-note enter"><span class="state ${t.status}" id="task-status">${STATUS[t.status]}</span> · <span class="id">${esc(t.id)}</span></p>
+          <h1 class="mask host" title="${esc(t.input.source)}"><span>${esc(host)}<small>${esc(rest || t.input.source)}</small></span></h1>
+          <p class="page-note enter"><span class="state ${t.status}" id="task-status">${STATUS[t.status]}</span> · ${esc(ago(t.createdAt))} · <span class="id">${esc(t.id)}</span></p>
         </div>
         <div class="head-actions enter">
           <a class="back" href="/app" id="back-btn">← 任务列表</a>
@@ -801,23 +979,25 @@ main { padding: 0 var(--margin); }
         </div>
       </div>
 
-      <div id="result-block"></div>
-
-      <section class="detail-block enter" id="log-block">
-        <div class="section-head enter" style="margin:0 0 18px"><h2>捕获过程</h2><span class="count" id="log-count"></span></div>
-        <div id="progress-block">
-          <div class="progress" role="progressbar" aria-label="捕获进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progress-bar"></i></div>
-          <p class="progress-note enter" id="progress-note">准备中</p>
-        </div>
-        <pre class="log enter" id="log" aria-live="polite"></pre>
+      <section class="progress-card enter" id="progress-block">
+        <div class="progress" role="progressbar" aria-label="捕获进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progress-bar"></i></div>
+        <p class="progress-note" id="progress-note">准备中</p>
       </section>
 
+      <div id="result-block"></div>
       <div id="generation-block"></div>
-      <div id="verify-block-wrap"></div>`
+      <div id="verify-block-wrap"></div>
+
+      <section class="detail-block enter" id="log-block">
+        <details id="log-details" open>
+          <summary class="section-head"><h2>捕获过程</h2><span class="count" id="log-count"></span></summary>
+          <pre class="log" id="log" aria-live="polite" tabindex="0"></pre>
+        </details>
+      </section>`
 
     page.querySelector('#back-btn').onclick = (e) => { e.preventDefault(); navigate('/app') }
     $('#delete-task').onclick = async () => {
-      if (!confirm('删除该任务及其全部产物？')) return
+      if (!confirm(`删除 ${hostOf(t.input.source).host} 的这个任务？\n截图、验证报告等全部产物都会一起删除，无法恢复。`)) return
       if (DEMO) { state.tasks = state.tasks.filter((x) => x.id !== t.id); navigate('/app', true); return }
       try {
         const res = await api(`/api/tasks/${t.id}`, { method: 'DELETE' })
@@ -858,7 +1038,17 @@ main { padding: 0 var(--margin); }
     if (track) track.setAttribute('aria-valuenow', String(pct))
     const elapsed = t.result?.durationMs ?? (t.startedAt ? Date.now() - new Date(t.startedAt).getTime() : null)
     const live = t.status === 'running' || t.status === 'queued'
-    setText($('#progress-note'), `${label} · ${pct}%${t.status === 'running' && elapsed ? ` · ${fmtDuration(elapsed)}` : ''}${live ? ' · 跑在服务端，可以关掉页面回来看' : ''}`)
+    setText($('#progress-note'), t.status === 'failed'
+      ? '捕获失败，原因见下方。'
+      : `${label} · ${pct}%${t.status === 'running' && elapsed ? ` · ${fmtDuration(elapsed)}` : ''}${live ? ' · 跑在服务端，可以关掉页面回来看' : ''}`)
+    const card = $('#progress-block')
+    if (card) card.classList.toggle('finished', !live)
+    // a finished task opens with the log folded away; one that finishes while you watch stays put
+    const details = $('#log-details')
+    if (details && !details.dataset.init) {
+      details.dataset.init = '1'
+      if (t.status === 'done') details.open = false
+    }
 
     // log: append only the lines that are new (streaming, never re-rendered)
     const log = $('#log')
@@ -915,7 +1105,7 @@ main { padding: 0 var(--margin); }
     const r = t.result
     if (!r) {
       el.innerHTML = t.error
-        ? `<section class="detail-block enter"><div class="section-head" style="margin:0 0 14px"><h2>失败原因</h2><span class="state failed">失败</span></div><pre class="log">${esc(t.error)}</pre></section>`
+        ? `<section class="detail-block enter"><img class="state-art wide" src="/art/task-error.webp" alt="" width="1280" height="800" loading="lazy" style="margin-bottom:16px" /><div class="section-head" style="margin:0 0 14px"><h2>失败原因</h2><span class="state failed">失败</span></div><pre class="log">${esc(t.error)}</pre></section>`
         : ''
       return
     }
@@ -933,32 +1123,33 @@ main { padding: 0 var(--margin); }
       ['状态', `<span class="state ${t.status}">${STATUS[t.status]}</span>`],
       ['视口', (r.viewports ?? t.options?.viewports ?? []).join(' / ') || '默认'],
       ['DOM 节点', r.domNodes ?? '-'],
-      ['资产', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`],
+      ['图片与字体等资源', `${r.assetsOk} 成功 / ${r.assetsFailed} 失败`],
       ['动态区域', `${r.dynamicRegions} 处`],
-      ['自动关闭弹窗', r.dismissed],
+      ['自动关闭的弹窗', r.dismissed],
       ['耗时', fmtDuration(r.durationMs)],
-      t.worker?.pid ? ['Worker PID', t.worker.pid] : null,
+      isAdmin() && t.worker?.pid ? ['Worker PID', t.worker.pid] : null,
       t.sizeBytes ? ['占用', fmtBytes(t.sizeBytes)] : null,
     ].filter(Boolean)
     el.innerHTML = `
       <section class="detail-block enter">
         ${shot ? `<div class="halves enter">
           <figure>
-            <figcaption>输入 · 原站截图 ${vp}px</figcaption>
-            <div class="frame"><img src="${artifactUrl(t, shot)}" alt="原站 ${esc(t.input.source)} 在 ${vp}px 下的捕获" width="1440" height="900" /></div>
+            <figcaption>原站 · ${vp}px</figcaption>
+            <div class="frame"><img src="${artifactUrl(t, shot)}" alt="原站 ${esc(t.input.source)} 在 ${vp}px 下的捕获" width="1200" height="750" /></div>
           </figure>
           <figure>
-            <figcaption>输出 · 还原页同视口</figcaption>
-            <div class="frame">${reproSrc ? `<img src="${reproSrc}" alt="还原页在 ${vp}px 下的截图" width="1440" height="900" />` : '<p class="empty" style="padding:28px 16px">提交还原工程后在这里出现对照。</p>'}</div>
+            <figcaption>还原页 · ${vp}px</figcaption>
+            <div class="frame">${reproSrc ? `<img src="${reproSrc}" alt="还原页在 ${vp}px 下的截图" width="1200" height="750" />` : '<img src="/art/no-repro.webp" alt="还没有还原页" width="1200" height="750" loading="lazy" />'}</div>
+            ${reproSrc ? '' : '<p class="hint" style="padding:0 14px 14px">还没有还原页。下方上传还原工程的 zip，这里就会出现并排对照。</p>'}
           </figure>
         </div>${heatSrc ? `
-        <figure class="band enter">
-          <figcaption>差异热力图 · 红色为像素差异，蓝色为被排除的动态区域</figcaption>
-          <div class="frame"><img src="${heatSrc}" alt="原站与还原页的像素差异热力图" width="1440" height="900" /></div>
+        <figure class="shot tall enter" style="margin-top:8px">
+          <a class="crop" href="${heatSrc}" target="_blank" rel="noreferrer" aria-label="在新标签页打开完整热力图"><img src="${heatSrc}" alt="原站与还原页的像素差异热力图" loading="lazy" /></a>
+          <figcaption>差异热力图 · 红色是像素差异，蓝色是被排除的动态区域。点击看完整图。</figcaption>
         </figure>` : ''}
-        ${shot2 ? `<figure class="band enter">
-          <figcaption>第二个视口 · ${vp2}px 下的捕获</figcaption>
-          <div class="frame auto"><img src="${artifactUrl(t, shot2)}" alt="原站 ${esc(t.input.source)} 在 ${vp2}px 下的捕获" width="900" height="1200" /></div>
+        ${shot2 ? `<figure class="shot tall enter" style="margin-top:8px">
+          <a class="crop" href="${artifactUrl(t, shot2)}" target="_blank" rel="noreferrer" aria-label="在新标签页打开完整 ${vp2}px 截图"><img src="${artifactUrl(t, shot2)}" alt="原站 ${esc(t.input.source)} 在 ${vp2}px 下的捕获" loading="lazy" /></a>
+          <figcaption>第二个视口 · ${vp2}px 下的捕获，只显示上半部分。点击看完整图。</figcaption>
         </figure>` : ''}` : ''}
         ${figures(t, metrics)}
         <dl class="facts">${facts.map(([k, v]) => `<div class="enter"><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
@@ -982,7 +1173,7 @@ main { padding: 0 var(--margin); }
 
   function wireVerification(t) {
     const pathInput = $('#verify-path'), pathBtn = $('#verify-path-btn'), zipBtn = $('#verify-zip-btn'), zipInput = $('#verify-zip')
-    if (!pathBtn || !zipBtn) return
+    if (!zipBtn) return
     const post = async (body, headers = {}) => {
       if (DEMO) throw new Error('演示模式：验证需要真实服务端。')
       const res = await api(`/api/tasks/${t.id}/verifications`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body })
@@ -991,9 +1182,11 @@ main { padding: 0 var(--margin); }
       return data
     }
     // keep a typed path across the rebuild of this block
-    pathInput.value = state.verifyPath ?? ''
-    pathInput.oninput = () => { state.verifyPath = pathInput.value }
-    pathBtn.onclick = async () => {
+    if (pathInput && pathBtn) {
+      pathInput.value = state.verifyPath ?? ''
+      pathInput.oninput = () => { state.verifyPath = pathInput.value }
+    }
+    if (pathBtn) pathBtn.onclick = async () => {
       const source = pathInput.value.trim()
       if (!source) return banner('请先填写还原工程目录。')
       pathBtn.disabled = true

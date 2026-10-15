@@ -126,7 +126,7 @@ input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-o
 
 .notice { padding: 12px 14px; border-radius: var(--radius); background: var(--surface); border-left: 3px solid var(--accent); font-size: var(--step-small); }
 
-.notice.bad { border-left-color: var(--ink); color: var(--ink); }
+.notice.bad { border-left-color: var(--danger); color: var(--ink); }
 
 .empty { color: var(--muted); font-size: var(--step-body); padding: 24px 0; }
 
@@ -187,6 +187,19 @@ input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-o
 
 /* ---------- status marks: flat, no pills ---------- */
   .state { font-size: var(--step-small); font-weight: 500; }
+
+/* ---------- section heads and counts (were used by the console without a rule) ---------- */
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 18px; }
+  .section-head h2 { font-size: var(--step-lead); letter-spacing: -0.02em; line-height: 1.2; }
+  .count { color: var(--muted); font-size: var(--step-small); font-variant-numeric: tabular-nums; }
+
+/* ---------- screenshots: never stretch, always keep the real ratio ---------- */
+  .shot { margin: 0; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
+  .shot img { display: block; width: 100%; height: auto; }
+  .shot figcaption { padding: 10px 14px 12px; color: var(--muted); font-size: var(--step-small); }
+  /* tall captures (768px) are cropped to a window; the full image opens on click */
+  .shot.tall .crop { display: block; max-height: 420px; overflow: hidden; }
+  .shot.tall img { object-fit: cover; object-position: top; }
 
 /* ---------- motion: masked headline, entrances, feedback ---------- */
   .mask { display: block; overflow: hidden; }
